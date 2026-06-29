@@ -29,10 +29,22 @@ async function fetchAllWords() {
   }
 }
 
+function updateStats() {
+  const wordCount = graphData ? graphData.nodes.length : 0;
+  const linkCount = graphData ? graphData.links.length : 0;
+  const selected = selectedWord || 'None';
+
+  document.querySelector('#wordCount').textContent = wordCount;
+  document.querySelector('#linkCount').textContent = linkCount;
+  document.querySelector('#selectedWord').textContent = selected;
+}
+
 function renderGraph() {
   const container = document.querySelector('.graph-container');
   const width = container.clientWidth;
   const height = container.clientHeight;
+
+  updateStats();
 
   // Clear previous
   d3.select('#graph').selectAll('*').remove();
@@ -181,6 +193,8 @@ function renderGraph() {
 
 async function selectWord(word) {
   selectedWord = word;
+  updateStats();
+
   document.querySelectorAll('.node').forEach((node, i) => {
     node.classList.remove('selected');
     if (graphData.nodes[i].word === word) {
@@ -218,6 +232,8 @@ function updateWordList() {
       </li>
     `)
     .join('');
+
+  updateStats();
 }
 
 function updateRhymeList(rhymes) {
