@@ -4,6 +4,7 @@ const path = require('path');
 const { getEmbedding, cosineSimilarity } = require('./embeddings');
 const { rhymeScore, findRhymes } = require('./rhyme');
 const ForceDirectedGraph = require('./forceLayout');
+const PoemGenerator = require('./poemGenerator');
 
 const app = express();
 const PORT = 3001;
@@ -103,6 +104,36 @@ app.get('/api/similar', (req, res) => {
 
 app.get('/api/words', (req, res) => {
   res.json({ words: commonWords });
+});
+
+app.post('/api/poem', (req, res) => {
+  const { words, theme, style } = req.body;
+  let wordList = words || commonWords;
+
+  const graph = buildPoetryGraph(wordList);
+  const generator = new PoemGenerator(graph);
+
+  let poem;
+  if (style === 'long') {
+    poem = generator.generateLongerPoem(theme);
+  } else if (style === 'couplets') {
+    poem = generator.createCouplets(graph.nodes.map(n => n.word));
+  } else if (style === 'stanza') {
+    poem = generator.createStanza(graph.nodes.map(n => n.word));
+  } else {
+    poem = generator.generateShortPoem(theme);
+  }
+
+  res.json({ poem, words: graph.nodes.map(n => n.word) });
+});
+
+app.get('/api/poem/:theme', (req, res) => {
+  const { theme } = req.params;
+  const graph = buildPoetryGraph(commonWords);
+  const generator = new PoemGenerator(graph);
+  const poem = generator.generateThematicPoem(theme, graph.nodes.map(n => n.word));
+
+  res.json({ poem, theme });
 });
 
 app.get('/health', (req, res) => {

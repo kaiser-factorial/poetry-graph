@@ -258,7 +258,7 @@ function updateSimilarList(similar) {
     .join('');
 }
 
-function generatePoem() {
+async function generatePoem() {
   const words = graphData ? graphData.nodes.map(n => n.word) : [];
 
   if (words.length === 0) {
@@ -266,44 +266,23 @@ function generatePoem() {
     return;
   }
 
-  const poem = createPoem(words);
+  try {
+    const response = await fetch(`${API_URL}/api/poem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        words,
+        style: selectedWord ? 'verse' : 'stanza',
+      }),
+    });
 
-  document.querySelector('#poemSection').style.display = 'block';
-  document.querySelector('#poemText').textContent = poem;
-}
-
-function createPoem(words) {
-  // Simple poem generation using the word graph
-  const shuffle = (arr) => {
-    const copy = [...arr];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-  };
-
-  const shuffled = shuffle(words);
-  const lines = [];
-
-  // Create a simple poem structure
-  const structures = [
-    ['In the [0], [1] [2]', 'Where [3] meets [4]', 'A [5] of [6]'],
-    ['[0] like [1]', '[2] through [3]', '[4] and [5]', '[6] at last'],
-    ['The [0] of [1]', 'Whispers [2]', 'In the [3]', '[4] with [5]'],
-  ];
-
-  const structure = structures[Math.floor(Math.random() * structures.length)];
-
-  for (const line of structure) {
-    let processedLine = line;
-    for (let i = 0; i < 7 && shuffled[i]; i++) {
-      processedLine = processedLine.replace(`[${i}]`, shuffled[i]);
-    }
-    lines.push(processedLine);
+    const data = await response.json();
+    document.querySelector('#poemSection').style.display = 'block';
+    document.querySelector('#poemText').textContent = data.poem;
+  } catch (error) {
+    console.error('Error generating poem:', error);
+    alert('Error generating poem. Make sure backend is running.');
   }
-
-  return lines.join('\n');
 }
 
 async function resetGraph() {
