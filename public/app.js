@@ -296,9 +296,12 @@ async function resetGraph() {
   await initGraph();
 }
 
-async function addCustomWords() {
-  const input = document.querySelector('#searchInput');
-  const words = input.value.split(/[\s,]+/).filter(w => w);
+async function addCustomWords(customWords) {
+  let words = customWords;
+  if (!customWords) {
+    const input = document.querySelector('#searchInput');
+    words = input.value.split(/[\s,]+/).filter(w => w);
+  }
 
   if (words.length === 0) return;
 
@@ -312,7 +315,9 @@ async function addCustomWords() {
     graphData = await response.json();
     renderGraph();
     updateWordList();
-    input.value = '';
+    if (!customWords && input) {
+      input.value = '';
+    }
   } catch (error) {
     console.error('Error building graph:', error);
   }
@@ -328,6 +333,21 @@ document.querySelector('#searchInput').addEventListener('keypress', (e) => {
 document.querySelector('#poemBtn').addEventListener('click', generatePoem);
 document.querySelector('#resetBtn').addEventListener('click', resetGraph);
 
+// Check for example words in localStorage
+const savedWords = localStorage.getItem('selectedWords');
+if (savedWords) {
+  try {
+    const words = JSON.parse(savedWords);
+    localStorage.removeItem('selectedWords'); // Clear after loading
+    addCustomWords(words);
+  } catch (e) {
+    // Ignore parsing errors
+  }
+}
+
 // Initialize
 initGraph();
 fetchAllWords();
+
+// Add link to examples
+document.querySelector('header').innerHTML += '<br><a href="examples.html" style="color: white; text-decoration: none; opacity: 0.8;">📚 View Examples</a>';

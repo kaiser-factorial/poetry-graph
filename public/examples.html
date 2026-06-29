@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poetry Graph - Examples</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            color: white;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            margin-top: 10px;
+            opacity: 0.8;
+            display: inline-block;
+        }
+
+        .back-link:hover {
+            opacity: 1;
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .example-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .example-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .example-card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .example-card .words {
+            color: #999;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .example-card .poem {
+            color: #333;
+            line-height: 1.8;
+            font-style: italic;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 3px solid #667eea;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .example-card .theme {
+            color: #764ba2;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .how-it-works {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .how-it-works h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .step {
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .step h3 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .step p {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌙 Poetry Graph</h1>
+            <p class="subtitle">Exploring Word Relationships Through Visualization</p>
+            <a href="index.html" class="back-link">← Back to Interactive Graph</a>
+        </header>
+
+        <div class="examples-grid">
+            <div class="example-card">
+                <h2>Love & Emotion</h2>
+                <div class="words">love, heart, beautiful, hope, soul</div>
+                <div class="poem">In love's embrace, heart blooms,
+Where beautiful meets the silent night.
+Light dances through forgotten dreams,
+A whisper of hope in the soul.</div>
+                <div class="theme">Emotional resonance through connected concepts</div>
+                <button class="button" onclick="loadExample(0)">Explore</button>
+            </div>
+
+            <div class="example-card">
+                <h2>Light & Darkness</h2>
+                <div class="words">light, night, star, moon, shine</div>
+                <div class="poem">love in the darkness,
+heart shines bright.
+
+The heart of your beautiful,
+Forever burns in my heart.
+
+beautiful whispers softly,
+night echoes back.</div>
+                <div class="theme">Contrasts that create meaning</div>
+                <button class="button" onclick="loadExample(1)">Explore</button>
+            </div>
+
+            <div class="example-card">
+                <h2>Passion & Fire</h2>
+                <div class="words">fire, passion, wine, divine, soul</div>
+                <div class="poem">The fire of passion,
+A journey through the night.
+wine calls to divine,
+In the eternal soul.</div>
+                <div class="theme">Intensity and transformation</div>
+                <button class="button" onclick="loadExample(2)">Explore</button>
+            </div>
+
+            <div class="example-card">
+                <h2>Nature's Beauty</h2>
+                <div class="words">sea, sky, dream, star, moon</div>
+                <div class="poem">sea in the darkness,
+sky shines bright.
+
+The sky of your dream,
+Forever burns in my heart.
+
+dream whispers softly,
+star echoes back.</div>
+                <div class="theme">Celestial and earthly harmony</div>
+                <button class="button" onclick="loadExample(3)">Explore</button>
+            </div>
+
+            <div class="example-card">
+                <h2>Sorrow & Rain</h2>
+                <div class="words">rain, pain, thorn, rose, sigh</div>
+                <div class="poem">pain calls to thorn,
+Through nights of endless rain.
+The rose we share, pain,
+Echoes still in sigh and cry.</div>
+                <div class="theme">Melancholy beauty in suffering</div>
+                <button class="button" onclick="loadExample(4)">Explore</button>
+            </div>
+
+            <div class="example-card">
+                <h2>Hope & Time</h2>
+                <div class="words">hope, time, soul, mind, find</div>
+                <div class="poem">hope falls like rain on time,
+The soul of freedom unfolds.
+In mind, I find hope,
+And free becomes my time.</div>
+                <div class="theme">Temporal and spiritual dimensions</div>
+                <button class="button" onclick="loadExample(5)">Explore</button>
+            </div>
+        </div>
+
+        <div class="how-it-works">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Embeddings</h3>
+                    <p>Each word is mapped to a vector capturing semantic meaning. Similar words have similar vectors.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Rhyming</h3>
+                    <p>Phonetic patterns identify which words rhyme, creating additional connections.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Layout</h3>
+                    <p>A force-directed algorithm positions words in 2D space, clustering related concepts.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Generation</h3>
+                    <p>Poems are created by walking through the graph, connecting semantically related words.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const examples = [
+            { words: ['love', 'heart', 'beautiful', 'hope', 'soul'] },
+            { words: ['light', 'night', 'star', 'moon', 'shine'] },
+            { words: ['fire', 'passion', 'wine', 'divine', 'soul'] },
+            { words: ['sea', 'sky', 'dream', 'star', 'moon'] },
+            { words: ['rain', 'pain', 'thorn', 'rose'] },
+            { words: ['hope', 'time', 'soul', 'mind', 'find'] },
+        ];
+
+        function loadExample(index) {
+            const example = examples[index];
+            localStorage.setItem('selectedWords', JSON.stringify(example.words));
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
