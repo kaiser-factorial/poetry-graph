@@ -43,4 +43,17 @@ function getOnset(word) {
   return w[0];
 }
 
-module.exports = { normalize, getRhymeEnding, getOnset };
+// Naive syllable count: vowel clusters, silent-e aware. Fallback only —
+// Datamuse provides real counts when reachable.
+function countSyllables(word) {
+  const w = normalize(word);
+  if (!w) return 0;
+  const clusters = w.match(/[aeiouy]+/g) || [];
+  let count = clusters.length;
+  if (count > 1 && w.endsWith('e') && !w.endsWith('le') && !VOWELS.includes(w[w.length - 2])) {
+    count -= 1;
+  }
+  return Math.max(count, 1);
+}
+
+module.exports = { normalize, getRhymeEnding, getOnset, countSyllables };

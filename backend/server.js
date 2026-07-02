@@ -4,7 +4,7 @@ const path = require('path');
 const axios = require('axios');
 const { getEmbedding, cosineSimilarity, embeddings } = require('./embeddings');
 const { rhymeScore, findRhymes } = require('./rhyme');
-const { getRhymeEnding, getOnset, normalize } = require('./phonetics');
+const { getRhymeEnding, getOnset, normalize, countSyllables } = require('./phonetics');
 const ForceDirectedGraph = require('./forceLayout');
 const PoemGenerator = require('./poemGenerator');
 
@@ -300,6 +300,30 @@ async function fetchAlliterations(onset) {
   return words;
 }
 
+// Part of speech + syllable count for a word (Datamuse md=ps, local fallback)
+const metaCache = new Map();
+const POS_TAGS = ['n', 'v', 'adj', 'adv'];
+
+async function fetchWordMeta(word) {
+  if (metaCache.has(word)) return metaCache.get(word);
+  let meta = { pos: [], syllables: countSyllables(word) };
+  try {
+    const { data } = await axios.get(DATAMUSE, {
+      params: { sp: word, md: 'ps', max: 1 },
+      timeout: 4000,
+    });
+    const entry = data[0];
+    if (entry && entry.word === word) {
+      meta = {
+        pos: (entry.tags || []).filter(t => POS_TAGS.includes(t)),
+        syllables: entry.numSyllables || countSyllables(word),
+      };
+    }
+  } catch (err) { /* fall back to local heuristics */ }
+  metaCache.set(word, meta);
+  return meta;
+}
+
 // Full info for a word as the user adds it to the workspace
 app.get('/api/word-info', async (req, res) => {
   const raw = req.query.word;
@@ -309,9 +333,9 @@ app.get('/api/word-info', async (req, res) => {
   const word = normalize(raw);
   const ending = getRhymeEnding(word);
   const onset = getOnset(word);
-  const rhymes = await fetchRhymes(word);
+  const [rhymes, meta] = await Promise.all([fetchRhymes(word), fetchWordMeta(word)]);
 
-  res.json({ word, ending, onset, rhymes });
+  res.json({ word, ending, onset, rhymes, pos: meta.pos, syllables: meta.syllables });
 });
 
 // Suggestions for an alliteration group

@@ -12,6 +12,16 @@ Poetry Graph combines three key concepts:
 
 The result is an interactive visualization where clicking on any word reveals its rhyming partners and semantically similar words, inspiring creative combinations and new perspectives on word relationships.
 
+## ✨ Poem Workspace (3D)
+
+The centerpiece: [workspace.html](public/workspace.html) is a WebGL force-directed space for drafting a poem's sound-palette.
+
+- Start from a lone **+** sphere; each word you add joins its **rhyme family** hub (`-ost`, `-ame`, …) or starts a new one
+- Click a hub to expand it: members plus real rhyme suggestions (Datamuse, frequency-filtered) you can add with one click
+- Toggle to **alliteration** and the same words physically reorganize under starting-sound hubs (`C-`, `WH-`, …)
+- Four connection layers — rhyme, alliteration, part of speech, syllable count — each with a **force slider** controlling how strongly it pulls words together
+- Orbit, zoom, and drag glossy spheres in a starfield with depth fog; poems persist locally and are shareable via `?seed=lost,name,cost`
+
 ## Features
 
 - 🎨 **Interactive Force-Directed Graph**: Drag, pan, and zoom to explore word relationships
