@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poetry Graph — Read</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #0c0b10;
+            --surface: #14131a;
+            --bone: #e8e2d3;
+            --muted: #8f897c;
+            --brass: #b39554;
+            --hairline: rgba(232, 226, 211, 0.14);
+            --hairline-strong: rgba(232, 226, 211, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--ink);
+            color: var(--bone);
+            min-height: 100vh;
+        }
+
+        header {
+            border-bottom: 1px solid var(--hairline);
+            padding: 14px 24px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.55em;
+            font-weight: 500;
+        }
+
+        header h1 .sub { color: var(--muted); font-style: italic; }
+        header nav { display: flex; gap: 22px; }
+
+        header a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            transition: color 0.2s;
+        }
+
+        header a:hover { color: var(--bone); }
+
+        .wrap {
+            max-width: 660px;
+            margin: 0 auto;
+            padding: 44px 24px 80px;
+        }
+
+        .intro {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.25rem;
+            font-style: italic;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 260px;
+            background: var(--surface);
+            border: 1px solid var(--hairline-strong);
+            color: var(--bone);
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            line-height: 1.8;
+            padding: 18px 20px;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus { border-color: var(--brass); }
+        textarea::placeholder { color: var(--muted); font-style: italic; }
+
+        .actions {
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            margin-top: 14px;
+        }
+
+        button.primary {
+            background: transparent;
+            border: 1px solid var(--brass);
+            color: var(--brass);
+            padding: 9px 20px;
+            cursor: pointer;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.13em;
+            transition: all 0.2s ease;
+        }
+
+        button.primary:hover { color: #d4b877; border-color: #d4b877; transform: translateY(-1px); }
+
+        button.ghost {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            transition: color 0.2s;
+        }
+
+        button.ghost:hover { color: var(--bone); }
+
+        .report {
+            margin-top: 36px;
+            border-top: 1px solid var(--hairline);
+            padding-top: 26px;
+            display: none;
+        }
+
+        .report h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .stat-row {
+            display: flex;
+            gap: 34px;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+
+        .stat .num {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            color: var(--brass);
+        }
+
+        .stat .lab {
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+        }
+
+        .report h3 {
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            margin: 18px 0 8px;
+            font-weight: 500;
+        }
+
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        .chip {
+            border: 1px solid var(--hairline);
+            color: var(--bone);
+            padding: 3px 11px 4px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1rem;
+        }
+
+        .chip.cut { color: var(--muted); border-style: dotted; }
+        .chip .k { color: var(--brass); font-size: 0.78em; margin-left: 5px; }
+
+        .note {
+            font-size: 0.78rem;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-top: 14px;
+        }
+
+        .note b { color: #d9be7c; font-weight: 500; }
+
+        .open-map {
+            display: inline-block;
+            margin-top: 22px;
+            background: transparent;
+            border: 1px solid var(--brass);
+            color: var(--brass);
+            padding: 11px 24px;
+            cursor: pointer;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.13em;
+            transition: all 0.2s ease;
+        }
+
+        .open-map:hover { color: #d4b877; border-color: #d4b877; transform: translateY(-1px); }
+
+        .working { color: var(--muted); font-style: italic; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Poetry Graph <span class="sub">— read</span></h1>
+        <nav>
+            <a href="workspace.html">Workspace</a>
+            <a href="forms.html">Forms</a>
+            <a href="index.html">Explorer</a>
+        </nav>
+    </header>
+
+    <div class="wrap">
+        <p class="intro">Paste a poem that already exists, and see its sound-structure —
+        rhyme families, alliterations, meter — mapped as a constellation.</p>
+
+        <textarea id="poemInput" placeholder="paste a poem here…" spellcheck="false"></textarea>
+        <div class="actions">
+            <button class="primary" id="analyzeBtn">Map the poem</button>
+            <button class="ghost" id="sampleBtn">try a sample (Frost)</button>
+            <span class="working" id="working" style="display: none;">listening to the poem…</span>
+        </div>
+
+        <div class="report" id="report">
+            <h2>What the poem sounds like</h2>
+            <div class="stat-row">
+                <div class="stat"><div class="num" id="statKept">0</div><div class="lab">words mapped</div></div>
+                <div class="stat"><div class="num" id="statGroups">0</div><div class="lab">rhyme families</div></div>
+                <div class="stat"><div class="num" id="statCut">0</div><div class="lab">loners cut</div></div>
+                <div class="stat"><div class="num" id="statSkipped">0</div><div class="lab">function words skipped</div></div>
+            </div>
+
+            <h3>Rhyme families found</h3>
+            <div class="chips" id="groupChips"></div>
+
+            <h3 id="cutHeader">Cut — no rhyme or alliteration partner in this poem</h3>
+            <div class="chips" id="cutChips"></div>
+
+            <p class="note">Words that end a line are shown in <b>brass</b> on the map — they carry
+            the rhyme scheme. Function words (the, and, of…) are left out entirely.</p>
+
+            <button class="open-map" id="openMapBtn">open the sound map →</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3001';
+
+        const STOPWORDS = new Set(('the a an and or but of to in on at by for with from as is are was were be been am ' +
+            'it its this that these those i you he she we they him her them my your his our their me us so if then than ' +
+            'too not no nor do does did has have had will shall would should can could may might must there here when ' +
+            'where while what who whom how why o oh into upon out up down all each both more most some any through till ' +
+            'until again also just yet ere thee thou thy ye doth dost hath oer neath tis twas').split(' '));
+
+        const VOWELS = 'aeiouy';
+        const SILENT_STARTS = { kn: 'n', gn: 'n', wr: 'r', ps: 's', pn: 'n', mn: 'n' };
+        const DIGRAPHS = ['ch', 'sh', 'th', 'ph', 'wh'];
+
+        function localOnset(w) {
+            const two = w.slice(0, 2);
+            if (SILENT_STARTS[two]) return SILENT_STARTS[two];
+            if (DIGRAPHS.includes(two)) return two;
+            return w[0];
+        }
+
+        function localEnding(w) {
+            if (w.length <= 2) return w;
+            let end = w.length - 1;
+            if (w[end] === 'e' && !VOWELS.includes(w[end - 1])) end -= 1;
+            let i = end;
+            while (i >= 0 && !VOWELS.includes(w[i])) i--;
+            if (i < 0) return w;
+            while (i > 0 && VOWELS.includes(w[i - 1])) i--;
+            return w.slice(i);
+        }
+
+        function localSyllables(w) {
+            const clusters = w.match(/[aeiouy]+/g) || [];
+            let count = clusters.length;
+            if (count > 1 && w.endsWith('e') && !w.endsWith('le') && !VOWELS.includes(w[w.length - 2])) count -= 1;
+            return Math.max(count, 1);
+        }
+
+        const SAMPLE = `Nature's first green is gold,
+Her hardest hue to hold.
+Her early leaf's a flower;
+But only so an hour.
+Then leaf subsides to leaf.
+So Eden sank to grief,
+So dawn goes down to day.
+Nothing gold can stay.`;
+
+        document.querySelector('#sampleBtn').addEventListener('click', () => {
+            document.querySelector('#poemInput').value = SAMPLE;
+        });
+
+        async function wordInfo(text) {
+            try {
+                const res = await fetch(`${API_URL}/api/word-info?word=${encodeURIComponent(text)}`);
+                if (!res.ok) throw new Error();
+                return await res.json();
+            } catch (e) {
+                return { word: text, ending: localEnding(text), onset: localOnset(text), syllables: localSyllables(text), pos: [], rhymes: [] };
+            }
+        }
+
+        let mapped = null;
+
+        document.querySelector('#analyzeBtn').addEventListener('click', async () => {
+            const text = document.querySelector('#poemInput').value;
+            if (!text.trim()) return;
+
+            document.querySelector('#working').style.display = 'inline';
+            document.querySelector('#report').style.display = 'none';
+
+            // Tokenize, drop function words, remember line-enders
+            const candidates = new Map(); // text -> { lineEnd }
+            let skipped = 0;
+            for (const line of text.split('\n')) {
+                const tokens = (line.toLowerCase().match(/[a-z']+/g) || [])
+                    .map(t => t.replace(/'/g, ''))
+                    .filter(Boolean);
+                tokens.forEach((t, i) => {
+                    if (STOPWORDS.has(t)) { skipped++; return; }
+                    if (!candidates.has(t)) candidates.set(t, { lineEnd: false });
+                    if (i === tokens.length - 1) candidates.get(t).lineEnd = true;
+                });
+            }
+
+            // Fetch phonetics for every unique word
+            const infos = await Promise.all(
+                [...candidates.keys()].map(async t => ({ text: t, ...await wordInfo(t), lineEnd: candidates.get(t).lineEnd }))
+            );
+
+            // Sound-true rhyme grouping (same logic as the workspace)
+            const groups = []; // { key, members: [info] }
+            for (const info of infos) {
+                const rhymeSet = new Set(info.rhymes || []);
+                let group = groups.find(g =>
+                    g.members.some(m => rhymeSet.has(m.text) || (m.rhymes || []).includes(info.text)));
+                if (!group) {
+                    let key = info.ending;
+                    let n = 2;
+                    while (groups.some(g => g.key === key)) key = `${info.ending}·${n++}`;
+                    group = { key, members: [] };
+                    groups.push(group);
+                }
+                info.rhymeKey = group.key;
+                group.members.push(info);
+            }
+
+            // Onset families
+            const onsetCounts = new Map();
+            for (const info of infos) onsetCounts.set(info.onset, (onsetCounts.get(info.onset) || 0) + 1);
+
+            // Loners: alone in their rhyme family AND alone in their onset family
+            const kept = [];
+            const cut = [];
+            for (const info of infos) {
+                const rhymeSize = groups.find(g => g.key === info.rhymeKey).members.length;
+                if (rhymeSize > 1 || onsetCounts.get(info.onset) > 1) kept.push(info);
+                else cut.push(info);
+            }
+
+            mapped = kept;
+
+            // Report
+            const liveGroups = new Map();
+            for (const w of kept) {
+                if (!liveGroups.has(w.rhymeKey)) liveGroups.set(w.rhymeKey, []);
+                liveGroups.get(w.rhymeKey).push(w.text);
+            }
+            const realGroups = [...liveGroups.entries()].filter(([, m]) => m.length > 1);
+
+            document.querySelector('#statKept').textContent = kept.length;
+            document.querySelector('#statGroups').textContent = realGroups.length;
+            document.querySelector('#statCut').textContent = cut.length;
+            document.querySelector('#statSkipped').textContent = skipped;
+
+            document.querySelector('#groupChips').innerHTML = realGroups
+                .sort((a, b) => b[1].length - a[1].length)
+                .map(([key, members]) => `<span class="chip">${members.join(' · ')}<span class="k">-${key}</span></span>`)
+                .join('') || '<span class="chip cut">none — this poem keeps its sounds apart</span>';
+
+            document.querySelector('#cutChips').innerHTML = cut.length
+                ? cut.map(w => `<span class="chip cut">${w.text}</span>`).join('')
+                : '<span class="chip cut">nothing cut — every word found a partner</span>';
+
+            document.querySelector('#working').style.display = 'none';
+            document.querySelector('#report').style.display = 'block';
+        });
+
+        document.querySelector('#openMapBtn').addEventListener('click', () => {
+            if (!mapped) return;
+            localStorage.setItem('poetry-workspace-v2', JSON.stringify({
+                mode: 'rhyme',
+                words: mapped.map(w => ({
+                    text: w.text,
+                    rhymeKey: w.rhymeKey,
+                    onsetKey: w.onset,
+                    pos: w.pos || [],
+                    syllables: w.syllables || 1,
+                    lineEnd: !!w.lineEnd,
+                })),
+                forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
+                syllableAltitude: false,
+                draft: document.querySelector('#poemInput').value,
+                form: null, formSlots: {}, formBodies: {},
+            }));
+            window.location.href = 'workspace.html';
+        });
+    </script>
+</body>
+</html>

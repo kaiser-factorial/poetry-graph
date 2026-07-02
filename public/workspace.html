@@ -115,7 +115,11 @@
             transition: all 0.25s ease;
         }
 
-        .toolbar .button:hover { color: var(--bone); border-color: var(--hairline-strong); }
+        .toolbar .button:hover {
+            color: var(--bone);
+            border-color: var(--hairline-strong);
+            transform: translateY(-1px);
+        }
 
         .toolbar .button.primary {
             color: var(--brass);
@@ -165,13 +169,42 @@
             font-size: 0.95em;
             cursor: pointer;
             color: var(--muted);
+            transition: color 0.2s, transform 0.2s;
         }
+
+        .panel-close:hover { transform: scale(1.2); }
 
         .panel-close:hover { color: var(--bone); }
 
         /* Draggable + collapsible panels */
         .drag-handle { cursor: grab; user-select: none; }
         .drag-handle:active { cursor: grabbing; }
+
+        .panel, .forces, .draft {
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .panel:hover, .forces:hover, .draft:hover {
+            border-color: var(--hairline-strong);
+            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5);
+        }
+
+        .resize-handle {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            background:
+                linear-gradient(135deg, transparent 55%, rgba(232, 226, 211, 0.35) 55%, rgba(232, 226, 211, 0.35) 62%, transparent 62%,
+                    transparent 72%, rgba(232, 226, 211, 0.35) 72%, rgba(232, 226, 211, 0.35) 79%, transparent 79%);
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+
+        .resize-handle:hover { opacity: 1; }
+        .collapsed .resize-handle { display: none; }
 
         .header-btns { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
@@ -185,7 +218,8 @@
             line-height: 1;
         }
 
-        .collapse-btn:hover { color: var(--bone); }
+        .collapse-btn { transition: color 0.2s, transform 0.2s; }
+        .collapse-btn:hover { color: var(--bone); transform: scale(1.2); }
 
         .panel.collapsed .panel-body { display: none; }
         .panel.collapsed { max-height: none; }
@@ -244,7 +278,8 @@
             letter-spacing: 0.12em;
         }
 
-        .add-input button:hover { border-color: var(--brass); color: var(--brass); }
+        .add-input button { transition: all 0.2s ease; }
+        .add-input button:hover { border-color: var(--brass); color: var(--brass); transform: translateY(-1px); }
 
         .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -259,7 +294,12 @@
             transition: all 0.15s ease;
         }
 
-        .chip:hover { border-color: var(--brass); color: var(--brass); }
+        .chip:hover {
+            border-color: var(--brass);
+            color: var(--brass);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+        }
 
         .chip.member { border-color: rgba(179, 149, 84, 0.55); color: var(--brass); }
         .chip.member .x { margin-left: 6px; opacity: 0.5; font-size: 0.8em; }
@@ -501,6 +541,8 @@
             outline: none;
         }
 
+        .t-end { transition: box-shadow 0.2s, border-color 0.2s; }
+        .t-end:not(:disabled):hover { box-shadow: 0 0 0 1px var(--hairline-strong); }
         .t-end.armed { box-shadow: 0 0 0 1.5px var(--brass); }
         .t-end:disabled { opacity: 0.55; }
 
@@ -617,6 +659,7 @@
             <button class="button primary" id="addWordBtn">＋ Add Word</button>
             <button class="button" id="draftBtn">Draft</button>
             <button class="button" id="newPoemBtn">New Poem</button>
+            <a href="read.html">Read</a>
             <a href="forms.html">Forms</a>
             <a href="index.html">Explorer</a>
         </div>
@@ -675,6 +718,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=9"></script>
+    <script type="module" src="workspace.js?v=10"></script>
 </body>
 </html>

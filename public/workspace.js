@@ -154,7 +154,13 @@ function buildGraphData() {
     groups.get(key).push(word);
   }
 
+  // In small poems every group gets its circle (watching "-ost" appear as
+  // you type is the point). In larger maps — like a read-in poem — lone
+  // words float free instead of spawning singleton hubs.
+  const showSingletonHubs = state.words.length <= 10;
+
   for (const [key, members] of groups) {
+    if (members.length < 2 && !showSingletonHubs) continue;
     const id = `hub:${state.mode}:${key}`;
     let node = nodeCache.get(id);
     if (!node) {
@@ -177,7 +183,10 @@ function buildGraphData() {
 
   for (const word of state.words) {
     nodes.push(cachedNode(`w:${word.text}`, { type: 'word', word }));
-    links.push({ source: `w:${word.text}`, target: `hub:${state.mode}:${activeKeyOf(word)}`, kind: 'member' });
+    const key = activeKeyOf(word);
+    if (groups.get(key).length >= 2 || showSingletonHubs) {
+      links.push({ source: `w:${word.text}`, target: `hub:${state.mode}:${key}`, kind: 'member' });
+    }
   }
 
   // Cross-links for every non-grouping connection type with weight > 0
@@ -235,7 +244,30 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
     else if (node.type === 'word') openGroupPanel(activeKeyOf(node.word));
   })
   .onNodeDragEnd(node => { node.fx = null; node.fy = null; node.fz = null; })
+  .onNodeHover(node => {
+    container.style.cursor = node ? 'pointer' : '';
+    if (hoveredNode === node) return;
+    if (hoveredNode) applyNodeHover(hoveredNode, false);
+    hoveredNode = node || null;
+    if (hoveredNode) applyNodeHover(hoveredNode, true);
+  })
   .onBackgroundClick(() => { if (panelMode !== 'closed') closePanel(); });
+
+let hoveredNode = null;
+
+function wordLabelColor(word) {
+  return word.lineEnd ? '#d9be7c' : '#f2ede0';
+}
+
+function applyNodeHover(node, on) {
+  const obj = node.__threeObj;
+  if (!obj) return;
+  obj.scale.setScalar(on ? (node.type === 'word' ? 1.18 : 1.07) : 1);
+  if (node.type === 'word') {
+    const label = obj.children.find(c => c instanceof SpriteText);
+    if (label) label.color = on ? '#ffffff' : wordLabelColor(node.word);
+  }
+}
 
 // Forces: members hold their hub tight; cross-links pull per slider weight.
 // Charge (repulsion) is set per-refresh, scaled to the number of words —
@@ -439,7 +471,8 @@ function makeNodeObject(node) {
       new THREE.SphereGeometry(r, 16, 16),
       new THREE.MeshBasicMaterial({ color: POS_TINTS[node.word.pos?.[0]] ?? 0x9b9588 })
     );
-    const label = new SpriteText(node.word.text, 10, '#f2ede0');
+    // Line-ending words (from a read-in poem) carry the rhyme scheme — brass
+    const label = new SpriteText(node.word.text, 10, wordLabelColor(node.word));
     label.fontFace = SERIF;
     label.fontWeight = '600';
     label.strokeColor = 'rgba(12,11,16,0.85)';
@@ -1135,10 +1168,10 @@ document.querySelector('#draftClose').addEventListener('click', () => {
 // Every floating box can be dragged by its header and collapsed to a bar;
 // positions and collapsed states persist.
 const UI_KEY = 'poetry-workspace-ui-v1';
-let ui = { collapsed: {}, pos: {} };
+let ui = { collapsed: {}, pos: {}, size: {} };
 try {
   const savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
-  ui = { collapsed: savedUi.collapsed || {}, pos: savedUi.pos || {} };
+  ui = { collapsed: savedUi.collapsed || {}, pos: savedUi.pos || {}, size: savedUi.size || {} };
 } catch (e) { /* defaults */ }
 
 function saveUi() {
@@ -1208,6 +1241,46 @@ function setupFloatingPanel(name, el) {
     applyCollapse();
   });
   applyCollapse();
+
+  // resizing (corner grip)
+  const grip = document.createElement('div');
+  grip.className = 'resize-handle';
+  el.appendChild(grip);
+
+  const applySize = () => {
+    const s = ui.size[name];
+    if (!s) return;
+    el.style.width = `${s.w}px`;
+    el.style.height = `${s.h}px`;
+    el.style.maxHeight = 'none';
+    el.style.overflowY = 'auto';
+  };
+  applySize();
+
+  grip.addEventListener('pointerdown', e => {
+    const m = mainEl.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const startW = r.width;
+    const startH = r.height;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const move = ev => {
+      ui.size[name] = {
+        w: Math.max(230, Math.min(startW + ev.clientX - startX, m.width - 20)),
+        h: Math.max(110, Math.min(startH + ev.clientY - startY, m.height - 20)),
+      };
+      applySize();
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      saveUi();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    e.preventDefault();
+    e.stopPropagation();
+  });
 }
 
 setupFloatingPanel('panel', document.querySelector('#panel'));

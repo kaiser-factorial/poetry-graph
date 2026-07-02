@@ -269,7 +269,8 @@
             letter-spacing: 0.12em;
         }
 
-        .try-link:hover { border-color: var(--brass); color: var(--brass); }
+        .try-link { transition: all 0.2s ease; }
+        .try-link:hover { border-color: var(--brass); color: var(--brass); transform: translateY(-1px); }
 
         @media (max-width: 800px) {
             .toc { display: none; }
@@ -281,6 +282,7 @@
         <h1>Poetry Graph <span class="sub">— forms</span></h1>
         <nav>
             <a href="workspace.html">Workspace</a>
+            <a href="read.html">Read</a>
             <a href="index.html">Explorer</a>
         </nav>
     </header>
