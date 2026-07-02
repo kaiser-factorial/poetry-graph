@@ -241,6 +241,7 @@
     <header>
         <h1>🌙 Poetry Graph</h1>
         <p class="subtitle">Map semantic and phonetic relationships between words</p>
+        <a href="workspace.html" style="display: inline-block; margin-top: 10px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; padding: 8px 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.5);">✍️ Start a New Poem</a>
     </header>
 
     <main>
@@ -279,8 +280,28 @@
                     <ul id="similarList" class="word-list"></ul>
                 </div>
 
-                <button class="button" id="poemBtn">Generate Poem</button>
-                <button class="button" id="resetBtn">Reset Graph</button>
+                <div class="word-section">
+                    <h3>Poem Type</h3>
+                    <select id="poemStyleSelect" style="width: 100%; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 0.9em;">
+                        <option value="short">Short Verse</option>
+                        <option value="verse">Verse</option>
+                        <option value="haiku">Haiku (5-7-5)</option>
+                        <option value="limerick">Limerick (AABBA)</option>
+                        <option value="couplets">Couplets</option>
+                        <option value="stanza">Stanza</option>
+                        <option value="sonnet">Sonnet (14 lines)</option>
+                        <option value="sestina">Sestina (complex)</option>
+                        <option value="ballad">Ballad (narrative)</option>
+                        <option value="free-verse">Free Verse</option>
+                        <option value="acrostic">Acrostic</option>
+                        <option value="triolet">Triolet</option>
+                        <option value="villanelle">Villanelle</option>
+                        <option value="long">Long Form</option>
+                    </select>
+                </div>
+
+                <button class="button" id="poemBtn">✨ Generate Poem</button>
+                <button class="button" id="resetBtn">↻ Reset Graph</button>
 
                 <div class="poem-section" id="poemSection" style="display: none;">
                     <h3>Generated Poem</h3>

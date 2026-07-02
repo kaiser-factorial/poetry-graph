@@ -282,13 +282,16 @@ async function generatePoem() {
     return;
   }
 
+  const styleSelect = document.querySelector('#poemStyleSelect');
+  const style = styleSelect ? styleSelect.value : 'verse';
+
   try {
     const response = await fetch(`${API_URL}/api/poem`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         words,
-        style: selectedWord ? 'verse' : 'stanza',
+        style,
       }),
     });
 
