@@ -89,6 +89,9 @@ let state = {
   forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
   syllableAltitude: false, // words stratify vertically by syllable count
   draft: '', // the poem-in-progress, written in the Draft drawer
+  form: null, // active poetic-form template (key into FORMS)
+  formSlots: {}, // end-word slot values, e.g. { A1: 'night' }
+  formBodies: {}, // line bodies keyed by line id
 };
 
 let selectedGroupKey = null;
@@ -107,6 +110,9 @@ function loadState() {
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
         state.draft = parsed.draft || '';
+        state.form = parsed.form || null;
+        state.formSlots = parsed.formSlots || {};
+        state.formBodies = parsed.formBodies || {};
       }
     }
   } catch (e) { /* fresh start */ }
@@ -219,8 +225,13 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
     return 0.3 + (state.forceWeights[link.kind] || 0) * 0.9;
   })
   .onNodeClick(node => {
-    if (node.type === 'plus') openAddPanel();
-    else if (node.type === 'hub') openGroupPanel(node.key);
+    if (node.type === 'plus') { openAddPanel(); return; }
+    // With a form template open, clicking a word fills the armed end-word box
+    if (node.type === 'word' && state.form &&
+        document.querySelector('#draft').style.display !== 'none') {
+      if (fillSlotFromGraph(node.word.text)) return;
+    }
+    if (node.type === 'hub') openGroupPanel(node.key);
     else if (node.type === 'word') openGroupPanel(activeKeyOf(node.word));
   })
   .onNodeDragEnd(node => { node.fx = null; node.fy = null; node.fz = null; })
@@ -718,6 +729,177 @@ function renderForcesPanel() {
   });
 }
 
+// ===== Poetic form templates =====
+// Each form is a list of stanzas of lines. A line carries an end-word slot;
+// slots repeat (rhyme scheme), and refrain lines mirror a whole source line.
+// First occurrence of a slot is editable; recurrences fill themselves.
+
+const SESTINA_PERM = [
+  [1, 2, 3, 4, 5, 6],
+  [6, 1, 5, 2, 4, 3],
+  [3, 6, 4, 1, 2, 5],
+  [5, 3, 2, 6, 1, 4],
+  [4, 5, 1, 3, 6, 2],
+  [2, 4, 6, 5, 3, 1],
+];
+
+function sestinaStanzas() {
+  const stanzas = SESTINA_PERM.map((perm, s) => ({
+    label: `stanza ${s + 1}`,
+    lines: perm.map((k, i) => ({ id: `s${s}l${i}`, slots: [`W${k}`], syl: 10 })),
+  }));
+  stanzas.push({
+    label: 'envoi',
+    lines: [
+      { id: 'e1', slots: ['W2', 'W5'], syl: 10 },
+      { id: 'e2', slots: ['W4', 'W3'], syl: 10 },
+      { id: 'e3', slots: ['W6', 'W1'], syl: 10 },
+    ],
+  });
+  return stanzas;
+}
+
+const FORMS = {
+  villanelle: {
+    name: 'Villanelle',
+    glance: '19 lines · 2 rhymes · 2 refrains',
+    about: 'Two whole lines return again and again — alternating as each tercet\'s close, colliding as the final couplet. Only two rhyme sounds carry all nineteen lines.',
+    tip: 'Pick two rhyme nodes. Fill the A1 and A2 end-word boxes and write those two lines once — they repeat themselves. Then harvest 5 more A words and 6 B words.',
+    hint: 'Write refrain lines <b>1</b> and <b>3</b> once — their echoes fill in. Click an end-word box, then click a word in the graph to fill it.',
+    stanzas: [
+      { label: 'tercet 1', lines: [
+        { id: 'v1', slots: ['A1'], refrain: 'R1', syl: 10 },
+        { id: 'v2', slots: ['B1'], syl: 10 },
+        { id: 'v3', slots: ['A2'], refrain: 'R2', syl: 10 },
+      ]},
+      { label: 'tercet 2', lines: [
+        { id: 'v4', slots: ['A3'], syl: 10 },
+        { id: 'v5', slots: ['B2'], syl: 10 },
+        { id: 'v6', lineMirrorOf: 'v1', refrain: 'R1' },
+      ]},
+      { label: 'tercet 3', lines: [
+        { id: 'v7', slots: ['A4'], syl: 10 },
+        { id: 'v8', slots: ['B3'], syl: 10 },
+        { id: 'v9', lineMirrorOf: 'v3', refrain: 'R2' },
+      ]},
+      { label: 'tercet 4', lines: [
+        { id: 'v10', slots: ['A5'], syl: 10 },
+        { id: 'v11', slots: ['B4'], syl: 10 },
+        { id: 'v12', lineMirrorOf: 'v1', refrain: 'R1' },
+      ]},
+      { label: 'tercet 5', lines: [
+        { id: 'v13', slots: ['A6'], syl: 10 },
+        { id: 'v14', slots: ['B5'], syl: 10 },
+        { id: 'v15', lineMirrorOf: 'v3', refrain: 'R2' },
+      ]},
+      { label: 'quatrain', lines: [
+        { id: 'v16', slots: ['A7'], syl: 10 },
+        { id: 'v17', slots: ['B6'], syl: 10 },
+        { id: 'v18', lineMirrorOf: 'v1', refrain: 'R1' },
+        { id: 'v19', lineMirrorOf: 'v3', refrain: 'R2' },
+      ]},
+    ],
+  },
+  sestina: {
+    name: 'Sestina',
+    glance: '39 lines · 6 end-words · no rhyme',
+    about: 'Six end-words spiral through six stanzas — each stanza folds the previous order outside-in — then all six land in a three-line envoi.',
+    tip: 'Fill the six end-word boxes in stanza 1 (flexible, many-sensed words survive best). The spiral and the envoi fill themselves.',
+    hint: 'Set the <b>six end-words in stanza 1</b> — every later box follows the spiral automatically.',
+    stanzas: sestinaStanzas(),
+  },
+  sonnet: {
+    name: 'Sonnet',
+    glance: '14 lines · ABAB CDCD EFEF GG · pentameter',
+    about: 'Three quatrains in alternating rhyme build the argument; the couplet turns it. Ten syllables to a line.',
+    tip: 'Seven rhyme nodes, two words each — breadth over depth. Save your best pair for the closing couplet.',
+    hint: 'Each rhyme sound is used exactly <b>twice</b>. Aim each line at <b>10 syllables</b> — the counter turns brass when you land it.',
+    stanzas: [
+      { label: 'quatrain 1', lines: [
+        { id: 'n1', slots: ['A1'], syl: 10 }, { id: 'n2', slots: ['B1'], syl: 10 },
+        { id: 'n3', slots: ['A2'], syl: 10 }, { id: 'n4', slots: ['B2'], syl: 10 },
+      ]},
+      { label: 'quatrain 2', lines: [
+        { id: 'n5', slots: ['C1'], syl: 10 }, { id: 'n6', slots: ['D1'], syl: 10 },
+        { id: 'n7', slots: ['C2'], syl: 10 }, { id: 'n8', slots: ['D2'], syl: 10 },
+      ]},
+      { label: 'quatrain 3', lines: [
+        { id: 'n9', slots: ['E1'], syl: 10 }, { id: 'n10', slots: ['F1'], syl: 10 },
+        { id: 'n11', slots: ['E2'], syl: 10 }, { id: 'n12', slots: ['F2'], syl: 10 },
+      ]},
+      { label: 'couplet', lines: [
+        { id: 'n13', slots: ['G1'], syl: 10 }, { id: 'n14', slots: ['G2'], syl: 10 },
+      ]},
+    ],
+  },
+  ballad: {
+    name: 'Ballad',
+    glance: 'quatrains · ABCB · 8/6 beat',
+    about: 'The storytelling form: quatrains alternating long and short lines, with only lines two and four rhyming. Extend it as far as the tale runs.',
+    tip: 'One fresh rhyme pair per stanza. Keep the beat: roughly 8 syllables, then 6.',
+    hint: 'Only lines <b>2 and 4</b> rhyme in each stanza — a fresh node every time. Watch the <b>8/6</b> pulse.',
+    stanzas: [1, 2, 3].map(q => ({
+      label: `stanza ${q}`,
+      lines: [
+        { id: `q${q}l1`, slots: [], syl: 8 },
+        { id: `q${q}l2`, slots: [`B${q}a`], syl: 6, schemeOverride: 'B' },
+        { id: `q${q}l3`, slots: [], syl: 8 },
+        { id: `q${q}l4`, slots: [`B${q}b`], syl: 6, schemeOverride: 'B' },
+      ],
+    })),
+  },
+  limerick: {
+    name: 'Limerick',
+    glance: '5 lines · AABBA · anapestic',
+    about: 'Long, long, short, short, long — and the last long line is the punchline. Keep it bouncing: da-da-DUM.',
+    tip: 'Pick your line-5 punchline word first, then work backwards through its rhyme node for lines 1 and 2.',
+    hint: 'Choose the <b>line 5</b> end-word first — it\'s the punchline. Lines 3–4 take a second node.',
+    stanzas: [{ label: 'the five', lines: [
+      { id: 'l1', slots: ['A1'], syl: 9 },
+      { id: 'l2', slots: ['A2'], syl: 9 },
+      { id: 'l3', slots: ['B1'], syl: 6 },
+      { id: 'l4', slots: ['B2'], syl: 6 },
+      { id: 'l5', slots: ['A3'], syl: 9 },
+    ]}],
+  },
+  triolet: {
+    name: 'Triolet',
+    glance: '8 lines · 2 rhymes · line 1 returns twice',
+    about: 'A miniature music box: line 1 returns as lines 4 and 7, line 2 returns as line 8. Only five lines are truly yours to write.',
+    tip: 'Write lines 1 and 2 so their meaning can shift on return. Two small rhyme nodes cover it.',
+    hint: 'Write lines <b>1</b> and <b>2</b> — their returns fill in. Three fresh A words, one fresh B.',
+    stanzas: [{ label: 'the eight', lines: [
+      { id: 't1', slots: ['A1'], refrain: 'Ra', syl: 8 },
+      { id: 't2', slots: ['B1'], refrain: 'Rb', syl: 8 },
+      { id: 't3', slots: ['A2'], syl: 8 },
+      { id: 't4', lineMirrorOf: 't1', refrain: 'Ra' },
+      { id: 't5', slots: ['A3'], syl: 8 },
+      { id: 't6', slots: ['B2'], syl: 8 },
+      { id: 't7', lineMirrorOf: 't1', refrain: 'Ra' },
+      { id: 't8', lineMirrorOf: 't2', refrain: 'Rb' },
+    ]}],
+  },
+  haiku: {
+    name: 'Haiku',
+    glance: '3 lines · 5 / 7 / 5 syllables',
+    about: 'Seventeen syllables and a cut: set an image, extend it, pivot. No rhyme to gather — this one is all meter.',
+    tip: 'Turn on syllables-as-altitude and read the strata like a till: budget each line, then spend.',
+    hint: 'No end-word boxes here — just hit <b>5 / 7 / 5</b>. The counter turns brass on target.',
+    stanzas: [{ label: 'the three', lines: [
+      { id: 'h1', slots: [], syl: 5 },
+      { id: 'h2', slots: [], syl: 7 },
+      { id: 'h3', slots: [], syl: 5 },
+    ]}],
+  },
+};
+
+// Color class from a slot name: A1 → cA, W3 → third color, B2a → cB
+function slotColorClass(slot, schemeOverride) {
+  if (schemeOverride) return `c${schemeOverride}`;
+  if (slot.startsWith('W')) return 'c' + 'ABCDEF'[parseInt(slot[1]) - 1];
+  return `c${slot[0]}`;
+}
+
 // ===== Draft drawer =====
 // A place to actually write — with a live syllable count per line.
 // Words already in the graph use their true (Datamuse) counts; everything
@@ -750,13 +932,199 @@ draftText.addEventListener('input', () => {
 });
 draftText.addEventListener('scroll', () => { draftGutter.scrollTop = draftText.scrollTop; });
 
-document.querySelector('#draftBtn').addEventListener('click', () => {
-  const open = draftEl.style.display !== 'none';
-  draftEl.style.display = open ? 'none' : 'flex';
-  if (!open) {
+// ===== Form template mode =====
+const templateWrap = document.querySelector('#templateWrap');
+const freeDraft = document.querySelector('#freeDraft');
+const formClearBtn = document.querySelector('#formClearBtn');
+const draftTitle = document.querySelector('#draftTitle');
+let armedSlot = null;
+let editableSlotOrder = [];
+
+function esc(v) {
+  return String(v || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function findLine(form, id) {
+  for (const stanza of form.stanzas) {
+    for (const line of stanza.lines) if (line.id === id) return line;
+  }
+  return null;
+}
+
+function renderTemplate() {
+  const form = FORMS[state.form];
+  if (!form) return;
+  const seen = new Set();
+  editableSlotOrder = [];
+  let html = `<div class="t-hint">${form.hint}</div>`;
+
+  for (const stanza of form.stanzas) {
+    html += `<div class="t-stanza"><div class="t-stanza-label">${stanza.label}</div>`;
+    for (const line of stanza.lines) {
+      const isMirror = !!line.lineMirrorOf;
+      const src = isMirror ? findLine(form, line.lineMirrorOf) : line;
+      const bodyId = isMirror ? line.lineMirrorOf : line.id;
+      const target = src.syl || 0;
+
+      html += `<div class="t-line" data-syl="${target}">
+        <span class="t-syl"></span>
+        <input class="t-body" data-body="${bodyId}" value="${esc(state.formBodies[bodyId])}" ${isMirror ? 'disabled' : ''} placeholder="${isMirror ? '' : '…'}">`;
+
+      for (const slot of (src.slots || [])) {
+        const editable = !isMirror && !seen.has(slot);
+        if (editable) {
+          seen.add(slot);
+          editableSlotOrder.push(slot);
+        }
+        html += `<input class="t-end ${slotColorClass(slot, src.schemeOverride)}" data-slot="${slot}" value="${esc(state.formSlots[slot])}" ${editable ? '' : 'disabled'} placeholder="${slot}">`;
+      }
+
+      html += `<span class="t-ref">${line.refrain || ''}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  templateWrap.innerHTML = html;
+  wireTemplate();
+  updateTemplateSyls();
+  updateArmedHighlight();
+}
+
+function updateTemplateSyls() {
+  templateWrap.querySelectorAll('.t-line').forEach(row => {
+    const body = row.querySelector('.t-body')?.value || '';
+    const ends = [...row.querySelectorAll('.t-end')].map(i => i.value).join(' ');
+    const target = parseInt(row.dataset.syl) || 0;
+    const count = lineSyllables(`${body} ${ends}`.trim());
+    const span = row.querySelector('.t-syl');
+    span.textContent = count === '' ? (target ? `·/${target}` : '') : `${count}${target ? '/' + target : ''}`;
+    span.classList.toggle('hit', !!target && count === target);
+  });
+}
+
+function updateArmedHighlight() {
+  templateWrap.querySelectorAll('.t-end').forEach(input => {
+    input.classList.toggle('armed', !input.disabled && input.dataset.slot === armedSlot);
+  });
+}
+
+function syncSlotInputs(slot, except) {
+  templateWrap.querySelectorAll(`.t-end[data-slot="${slot}"]`).forEach(input => {
+    if (input !== except) input.value = state.formSlots[slot] || '';
+  });
+}
+
+function wireTemplate() {
+  templateWrap.querySelectorAll('.t-body:not([disabled])').forEach(input => {
+    input.addEventListener('input', () => {
+      state.formBodies[input.dataset.body] = input.value;
+      saveState();
+      templateWrap.querySelectorAll(`.t-body[disabled][data-body="${input.dataset.body}"]`)
+        .forEach(m => { m.value = input.value; });
+      updateTemplateSyls();
+    });
+  });
+
+  templateWrap.querySelectorAll('.t-end:not([disabled])').forEach(input => {
+    input.addEventListener('input', () => {
+      state.formSlots[input.dataset.slot] = input.value.trim();
+      saveState();
+      syncSlotInputs(input.dataset.slot, input);
+      updateTemplateSyls();
+    });
+    input.addEventListener('focus', () => {
+      armedSlot = input.dataset.slot;
+      updateArmedHighlight();
+    });
+  });
+}
+
+// Clicking a word in the graph fills the armed (or next empty) end-word box
+function fillSlotFromGraph(text) {
+  let slot = armedSlot;
+  if (!slot || state.formSlots[slot]) {
+    slot = editableSlotOrder.find(s => !state.formSlots[s]) || armedSlot;
+  }
+  if (!slot) return false;
+  state.formSlots[slot] = text;
+  saveState();
+  syncSlotInputs(slot, null);
+  armedSlot = editableSlotOrder.find(s => !state.formSlots[s]) || null;
+  updateArmedHighlight();
+  updateTemplateSyls();
+  return true;
+}
+
+function renderDraft() {
+  const formActive = !!(state.form && FORMS[state.form]);
+  draftEl.classList.toggle('form-mode', formActive);
+  freeDraft.style.display = formActive ? 'none' : 'flex';
+  templateWrap.style.display = formActive ? 'block' : 'none';
+  formClearBtn.style.display = formActive ? 'inline-block' : 'none';
+
+  if (formActive) {
+    draftTitle.innerHTML = `Draft <span class="draft-note">${FORMS[state.form].name} — ${FORMS[state.form].glance}</span>`;
+    renderTemplate();
+  } else {
+    draftTitle.innerHTML = 'Draft <span class="draft-note">syllables count themselves</span>';
     draftText.value = state.draft || '';
     updateDraftGutter();
-    draftText.focus();
+  }
+}
+
+function openDraft() {
+  draftEl.style.display = 'flex';
+  renderDraft();
+}
+
+formClearBtn.addEventListener('click', () => {
+  state.form = null;
+  state.formSlots = {};
+  state.formBodies = {};
+  armedSlot = null;
+  saveState();
+  renderDraft();
+});
+
+// ===== Form modal =====
+const formModal = document.querySelector('#formModal');
+let pendingForm = null;
+
+function showFormModal(key) {
+  const form = FORMS[key];
+  if (!form) return;
+  pendingForm = key;
+  document.querySelector('#modalTitle').textContent = form.name;
+  document.querySelector('#modalGlance').textContent = form.glance;
+  document.querySelector('#modalBody').textContent = form.about;
+  document.querySelector('#modalTip').textContent = form.tip;
+  document.querySelector('#modalGuide').href = `forms.html#${key}`;
+  formModal.style.display = 'flex';
+}
+
+document.querySelector('#modalBegin').addEventListener('click', () => {
+  formModal.style.display = 'none';
+  if (state.form !== pendingForm) {
+    state.form = pendingForm;
+    state.formSlots = {};
+    state.formBodies = {};
+  }
+  armedSlot = null;
+  saveState();
+  openDraft();
+});
+
+formModal.addEventListener('click', e => {
+  if (e.target === formModal) formModal.style.display = 'none';
+});
+
+document.querySelector('#draftBtn').addEventListener('click', () => {
+  const open = draftEl.style.display !== 'none';
+  if (open) {
+    draftEl.style.display = 'none';
+  } else {
+    openDraft();
+    if (!state.form) draftText.focus();
   }
 });
 document.querySelector('#draftClose').addEventListener('click', () => {
@@ -781,11 +1149,16 @@ document.querySelectorAll('#modeToggle button').forEach(btn => {
 });
 
 document.querySelector('#newPoemBtn').addEventListener('click', () => {
-  if (state.words.length && !confirm('Start a new poem? Current words will be cleared.')) return;
+  if (state.words.length && !confirm('Start a new poem? Words and form template will be cleared.')) return;
   state.words = [];
+  state.form = null;
+  state.formSlots = {};
+  state.formBodies = {};
+  armedSlot = null;
   nodeCache.clear();
   suggestionCache.clear();
   closePanel();
+  draftEl.style.display = 'none';
   saveState();
   refreshGraph();
 });
@@ -828,6 +1201,15 @@ fontsReady.then(() => initFromSeed()).then(async seeded => {
   if (state.words.length) {
     // frame the poem once the layout settles (the + node roams, so skip it)
     setTimeout(() => Graph.zoomToFit(900, 40, n => n.type !== 'plus'), 1400);
+  }
+
+  // ?form=villanelle → greet with the form reminder, then open its template.
+  // If that form is already in progress, skip the modal and resume.
+  const formParam = new URLSearchParams(window.location.search).get('form');
+  if (formParam && FORMS[formParam] && formParam !== state.form) {
+    showFormModal(formParam);
+  } else if (state.form && FORMS[state.form]) {
+    openDraft(); // resume an in-progress form draft
   }
 });
 
