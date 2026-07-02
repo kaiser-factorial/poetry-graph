@@ -1131,6 +1131,99 @@ document.querySelector('#draftClose').addEventListener('click', () => {
   draftEl.style.display = 'none';
 });
 
+// ===== Movable & collapsible panels =====
+// Every floating box can be dragged by its header and collapsed to a bar;
+// positions and collapsed states persist.
+const UI_KEY = 'poetry-workspace-ui-v1';
+let ui = { collapsed: {}, pos: {} };
+try {
+  const savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
+  ui = { collapsed: savedUi.collapsed || {}, pos: savedUi.pos || {} };
+} catch (e) { /* defaults */ }
+
+function saveUi() {
+  localStorage.setItem(UI_KEY, JSON.stringify(ui));
+}
+
+const mainEl = document.querySelector('main');
+
+function clampToMain(x, y, el) {
+  const m = mainEl.getBoundingClientRect();
+  const w = el.offsetWidth || 200;
+  return {
+    x: Math.max(4, Math.min(x, m.width - Math.min(w, m.width) - 4)),
+    y: Math.max(4, Math.min(y, m.height - 44)),
+  };
+}
+
+function placePanel(el, x, y) {
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+}
+
+function setupFloatingPanel(name, el) {
+  const handle = el.querySelector('.drag-handle');
+
+  // restore saved position (clamped in case the window shrank)
+  if (ui.pos[name]) {
+    const p = clampToMain(ui.pos[name].x, ui.pos[name].y, el);
+    placePanel(el, p.x, p.y);
+  }
+
+  // dragging
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('button, input, a, textarea, select')) return;
+    const m = mainEl.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const offX = e.clientX - r.left;
+    const offY = e.clientY - r.top;
+    const move = ev => {
+      const p = clampToMain(ev.clientX - m.left - offX, ev.clientY - m.top - offY, el);
+      placePanel(el, p.x, p.y);
+      ui.pos[name] = p;
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      saveUi();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+
+  // collapsing
+  const btn = el.querySelector('.collapse-btn');
+  const applyCollapse = () => {
+    el.classList.toggle('collapsed', !!ui.collapsed[name]);
+    btn.textContent = ui.collapsed[name] ? '＋' : '–';
+    btn.title = ui.collapsed[name] ? 'expand' : 'collapse';
+  };
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    ui.collapsed[name] = !ui.collapsed[name];
+    saveUi();
+    applyCollapse();
+  });
+  applyCollapse();
+}
+
+setupFloatingPanel('panel', document.querySelector('#panel'));
+setupFloatingPanel('forces', document.querySelector('#forces'));
+setupFloatingPanel('draft', document.querySelector('#draft'));
+
+window.addEventListener('resize', () => {
+  for (const [name, pos] of Object.entries(ui.pos)) {
+    const el = document.querySelector(`#${name === 'panel' ? 'panel' : name}`);
+    if (el && pos) {
+      const p = clampToMain(pos.x, pos.y, el);
+      placePanel(el, p.x, p.y);
+    }
+  }
+});
+
 // ===== Toolbar =====
 document.querySelector('#panelClose').addEventListener('click', closePanel);
 document.querySelector('#addWordBtn').addEventListener('click', openAddPanel);

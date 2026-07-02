@@ -169,6 +169,42 @@
 
         .panel-close:hover { color: var(--bone); }
 
+        /* Draggable + collapsible panels */
+        .drag-handle { cursor: grab; user-select: none; }
+        .drag-handle:active { cursor: grabbing; }
+
+        .header-btns { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+        .collapse-btn {
+            border: none;
+            background: transparent;
+            font-size: 1em;
+            cursor: pointer;
+            color: var(--muted);
+            padding: 0 5px;
+            line-height: 1;
+        }
+
+        .collapse-btn:hover { color: var(--bone); }
+
+        .panel.collapsed .panel-body { display: none; }
+        .panel.collapsed { max-height: none; }
+
+        .forces-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .forces-header h3 { margin-bottom: 0; }
+        .forces:not(.collapsed) .forces-header { margin-bottom: 12px; }
+        .forces.collapsed #forceRows,
+        .forces.collapsed .hint { display: none; }
+
+        .draft.collapsed { height: auto !important; }
+        .draft.collapsed .draft-body,
+        .draft.collapsed .template-wrap { display: none !important; }
+
         .panel-body { padding: 16px 18px; overflow-y: auto; }
 
         .panel-body h3 {
@@ -590,24 +626,31 @@
         <div id="graph3d"></div>
 
         <div class="panel" id="panel" style="display: none;">
-            <div class="panel-header">
+            <div class="panel-header drag-handle">
                 <h2 id="panelTitle">Add a word</h2>
-                <button class="panel-close" id="panelClose">✕</button>
+                <div class="header-btns">
+                    <button class="collapse-btn" data-collapse="panel">–</button>
+                    <button class="panel-close" id="panelClose">✕</button>
+                </div>
             </div>
             <div class="panel-body" id="panelBody"></div>
         </div>
 
         <div class="forces" id="forces" style="display: none;">
-            <h3>Connection Forces</h3>
+            <div class="forces-header drag-handle">
+                <h3>Connection Forces</h3>
+                <button class="collapse-btn" data-collapse="forces">–</button>
+            </div>
             <div id="forceRows"></div>
             <div class="hint">Sliders set how strongly each relationship pulls words together. Drag words · scroll to zoom · right-drag to pan.</div>
         </div>
 
         <div class="draft" id="draft" style="display: none;">
-            <div class="draft-header">
+            <div class="draft-header drag-handle">
                 <h3 id="draftTitle">Draft <span class="draft-note" id="draftNote">syllables count themselves</span></h3>
-                <div>
+                <div class="header-btns">
                     <button class="draft-mode-btn" id="formClearBtn" style="display: none;">free draft</button>
+                    <button class="collapse-btn" data-collapse="draft">–</button>
                     <button class="panel-close" id="draftClose">✕</button>
                 </div>
             </div>
@@ -632,6 +675,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=8"></script>
+    <script type="module" src="workspace.js?v=9"></script>
 </body>
 </html>
