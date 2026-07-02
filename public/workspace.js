@@ -5,7 +5,7 @@
 
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1?external=three';
 import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
-import { forceY } from 'https://esm.sh/d3-force-3d@3';
+import { forceY, forceCollide } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
 const API_URL = 'http://localhost:3001';
@@ -200,7 +200,9 @@ function buildGraphData() {
 // ===== 3D rendering =====
 const container = document.querySelector('#graph3d');
 
-const Graph = new ForceGraph3D(container)
+// Orbit controls (not trackball): the camera never rolls, so "up" is always
+// up — the stable frame of reference syllable altitude needs.
+const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
   .backgroundColor('#14102b')
   .showNavInfo(false)
   .nodeThreeObject(node => makeNodeObject(node))
@@ -218,18 +220,24 @@ const Graph = new ForceGraph3D(container)
   .onNodeDragEnd(node => { node.fx = null; node.fy = null; node.fz = null; })
   .onBackgroundClick(() => { if (panelMode !== 'closed') closePanel(); });
 
-// Forces: members hold their hub tight; cross-links pull per slider weight
+// Forces: members hold their hub tight; cross-links pull per slider weight.
+// Charge (repulsion) is set per-refresh, scaled to the number of words —
+// small poems stay compact, bigger ones get room to breathe.
 Graph.d3Force('link')
-  .distance(link => link.kind === 'member' ? 42 : 95)
+  .distance(link => link.kind === 'member' ? 28 : 65)
   .strength(link => {
     if (link.kind === 'member') return 0.9;
     return 0.35 * (state.forceWeights[link.kind] || 0);
   });
-Graph.d3Force('charge').strength(-140);
+Graph.d3Force('collide', forceCollide().radius(n => n.type === 'hub' ? 24 : 11));
+
+function scaledCharge() {
+  return -(30 + Math.min(state.words.length * 7, 110));
+}
 
 // Depth cues: fog + a sparse starfield + an extra light for specular pop
 const scene = Graph.scene();
-scene.fog = new THREE.FogExp2(0x14102b, 0.0015);
+scene.fog = new THREE.FogExp2(0x14102b, 0.0008);
 
 const starGeo = new THREE.BufferGeometry();
 const starPos = new Float32Array(900);
@@ -241,9 +249,32 @@ const keyLight = new THREE.PointLight(0xbfb0ff, 600, 0, 1.8);
 keyLight.position.set(120, 160, 220);
 scene.add(keyLight);
 
+// Distant nebulae: big soft additive glows far behind the poem
+function nebulaSprite(hex, size, x, y, z) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  g.addColorStop(0, `${hex}55`);
+  g.addColorStop(0.5, `${hex}22`);
+  g.addColorStop(1, `${hex}00`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
+  }));
+  sprite.scale.setScalar(size);
+  sprite.position.set(x, y, z);
+  return sprite;
+}
+scene.add(nebulaSprite('#7a5fd0', 900, -500, 250, -900));
+scene.add(nebulaSprite('#d05f9e', 700, 600, -200, -1100));
+scene.add(nebulaSprite('#4f7fd0', 550, 150, 420, -1000));
+
 // ===== Syllable altitude =====
 // Words float at a height set by their syllable count; guide rings mark strata.
-const STRATUM_SPACING = 60;
+const STRATUM_SPACING = 50;
 const strataGroup = new THREE.Group();
 scene.add(strataGroup);
 
@@ -265,22 +296,82 @@ function updateStrataGuides() {
   strataGroup.clear();
   if (!state.syllableAltitude || !state.words.length) return;
 
+  // Ring radius adapts to the words' actual horizontal spread
+  const placed = Graph.graphData().nodes.filter(n => n.type === 'word' && n.x !== undefined);
+  const radius = Math.min(400, Math.max(80,
+    ...placed.map(n => Math.hypot(n.x || 0, n.z || 0) + 30)));
+
   const counts = [...new Set(state.words.map(w => w.syllables || 1))].sort((a, b) => a - b);
   for (const count of counts) {
     const y = stratumY(count);
     const points = [];
     for (let i = 0; i <= 72; i++) {
       const a = (i / 72) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(a) * 135, y, Math.sin(a) * 135));
+      points.push(new THREE.Vector3(Math.cos(a) * radius, y, Math.sin(a) * radius));
     }
     const ring = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(points),
       new THREE.LineBasicMaterial({ color: 0xff9ff5, transparent: true, opacity: 0.2 })
     );
     const label = new SpriteText(`${count} syllable${count > 1 ? 's' : ''}`, 5, 'rgba(255,159,245,0.8)');
-    label.position.set(152, y, 0);
+    label.position.set(radius + 16, y, 0);
     strataGroup.add(ring, label);
   }
+}
+
+// Re-measure the rings once the layout settles
+Graph.onEngineStop(() => { if (state.syllableAltitude) updateStrataGuides(); });
+
+// ===== Planetary rendering =====
+function hashOf(str) {
+  let h = 0;
+  for (const c of String(str)) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+
+// Banded gas-giant texture; hue is deterministic per group key
+const hubTextureCache = new Map();
+function gasGiantTexture(key) {
+  if (hubTextureCache.has(key)) return hubTextureCache.get(key);
+  const hue = 225 + (hashOf(key) % 95); // blue → purple → magenta family
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 128;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < c.height; y++) {
+    const band = Math.sin(y * 0.32 + hue) * 0.5 + Math.sin(y * 0.11 + hue * 2) * 0.5;
+    const light = 40 + band * 13 + (Math.random() - 0.5) * 5;
+    ctx.fillStyle = `hsl(${hue + band * 16}, ${58 + band * 10}%, ${light}%)`;
+    ctx.fillRect(0, y, c.width, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  hubTextureCache.set(key, tex);
+  return tex;
+}
+
+// Speckled moon texture, tinted by part of speech
+const MOON_HUES = { n: 42, v: 16, adj: 28, adv: 285 }; // gold, coral, peach, lavender
+const moonTextureCache = new Map();
+function moonTexture(word) {
+  const pos = word.pos?.[0];
+  const cacheKey = `${word.text}:${pos || '?'}`;
+  if (moonTextureCache.has(cacheKey)) return moonTextureCache.get(cacheKey);
+  const hue = MOON_HUES[pos] ?? 42;
+  const sat = pos ? 85 : 35;
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 32;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = `hsl(${hue}, ${sat}%, 64%)`;
+  ctx.fillRect(0, 0, c.width, c.height);
+  const craters = 14 + (hashOf(word.text) % 12);
+  for (let i = 0; i < craters; i++) {
+    ctx.fillStyle = `hsla(${hue}, ${sat}%, ${40 + Math.random() * 16}%, 0.5)`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * 64, Math.random() * 32, 0.8 + Math.random() * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  moonTextureCache.set(cacheKey, tex);
+  return tex;
 }
 
 function makeNodeObject(node) {
@@ -288,48 +379,89 @@ function makeNodeObject(node) {
 
   if (node.type === 'hub') {
     const r = 11 + Math.min(node.memberCount * 1.6, 10);
-    const sphere = new THREE.Mesh(
+    const seed = hashOf(node.key);
+
+    const planet = new THREE.Mesh(
       new THREE.SphereGeometry(r, 32, 32),
       new THREE.MeshPhongMaterial({
-        color: 0x9d92f5, transparent: true, opacity: 0.4,
-        emissive: 0x6a5fd0, emissiveIntensity: 0.75,
-        shininess: 90, specular: 0xffffff, depthWrite: false,
+        map: gasGiantTexture(node.key),
+        transparent: true, opacity: 0.92,
+        emissive: 0x2a2258, emissiveIntensity: 0.5,
+        shininess: 35, specular: 0x8877cc,
       })
     );
+    planet.rotation.z = ((seed % 100) / 100 - 0.5) * 0.7; // axial tilt
+    planet.onBeforeRender = () => { planet.rotation.y += 0.0022; };
+
+    // atmosphere rim glow
+    const atmo = new THREE.Mesh(
+      new THREE.SphereGeometry(r * 1.22, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x8b7ff0, transparent: true, opacity: 0.14,
+        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+    );
+
+    // saturn ring
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r * 1.5, r * 2.05, 56),
+      new THREE.MeshBasicMaterial({
+        color: 0xbfb0ff, transparent: true, opacity: 0.28,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+    );
+    ring.rotation.x = Math.PI / 2 - 0.32;
+    ring.rotation.y = ((seed % 37) / 37 - 0.5) * 0.5;
+    ring.onBeforeRender = () => { ring.rotation.z += 0.0011; };
+
     const label = new SpriteText(node.label, 7, '#ffffff');
     label.fontWeight = '700';
-    label.strokeColor = 'rgba(20,16,43,0.9)';
-    label.strokeWidth = 1.2;
-    group.add(sphere, label);
+    label.strokeColor = 'rgba(20,16,43,0.95)';
+    label.strokeWidth = 1.4;
+    label.position.y = r + 8;
+
+    group.add(planet, atmo, ring, label);
     return group;
   }
 
   if (node.type === 'word') {
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(4.6, 24, 24),
+    const r = 3.6 + Math.min(node.word.syllables || 1, 5) * 0.9; // moons grow with syllables
+    const moon = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 24, 24),
       new THREE.MeshPhongMaterial({
-        color: 0xffc95e, emissive: 0x8a5c00, emissiveIntensity: 0.55,
-        shininess: 100, specular: 0xffffff,
+        map: moonTexture(node.word),
+        emissive: 0x5a3c08, emissiveIntensity: 0.4,
+        shininess: 60, specular: 0xffeecc,
       })
     );
+    moon.onBeforeRender = () => { moon.rotation.y += 0.004; };
     const label = new SpriteText(node.word.text, 5, '#ffffff');
     label.fontWeight = '600';
     label.strokeColor = 'rgba(20,16,43,0.9)';
     label.strokeWidth = 1.4;
-    label.position.y = 10;
-    group.add(sphere, label);
+    label.position.y = r + 6;
+    group.add(moon, label);
     return group;
   }
 
-  // plus node
-  const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(node.empty ? 10 : 6.5, 18, 18),
-    new THREE.MeshPhongMaterial({
-      color: 0x9f95e8, wireframe: true, transparent: true, opacity: 0.7,
+  // plus node: a little sun where new words are born
+  const r = node.empty ? 9 : 6;
+  const sun = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 24, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffe3a3 })
+  );
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(r * 1.6, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xffb347, transparent: true, opacity: 0.22,
+      side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
     })
   );
-  const label = new SpriteText('+', node.empty ? 9 : 6, '#ffffff');
-  group.add(sphere, label);
+  let t = Math.random() * Math.PI * 2;
+  halo.onBeforeRender = () => { t += 0.02; halo.scale.setScalar(1 + Math.sin(t) * 0.08); };
+  const sunLight = new THREE.PointLight(0xffd9a0, 220, 320, 1.9);
+  const label = new SpriteText('+', node.empty ? 8 : 5.5, 'rgba(90,60,10,0.95)');
+  group.add(sun, halo, sunLight, label);
   if (node.empty) {
     const hint = new SpriteText('click to add your first word', 4, 'rgba(235,230,255,0.85)');
     hint.position.y = -18;
@@ -339,6 +471,7 @@ function makeNodeObject(node) {
 }
 
 function refreshGraph() {
+  Graph.d3Force('charge').strength(scaledCharge());
   // graphData() reheats the simulation itself when the data changes
   Graph.graphData(buildGraphData());
   updateStrataGuides();
@@ -408,6 +541,8 @@ async function backfillMeta() {
     const info = await fetchWordInfo(w.text);
     w.pos = info.pos || [];
     w.syllables = info.syllables || localSyllables(w.text);
+    const node = nodeCache.get(`w:${w.text}`);
+    if (node) delete node.__threeObj; // size/tint depend on the new metadata
   }));
   saveState();
   refreshGraph();
