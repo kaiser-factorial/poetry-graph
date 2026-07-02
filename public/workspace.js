@@ -5,6 +5,7 @@
 
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1?external=three';
 import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
+import { forceY } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
 const API_URL = 'http://localhost:3001';
@@ -81,6 +82,7 @@ let state = {
   mode: 'rhyme', // grouping: 'rhyme' | 'alliteration'
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
   forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
+  syllableAltitude: false, // words stratify vertically by syllable count
 };
 
 let selectedGroupKey = null;
@@ -97,6 +99,7 @@ function loadState() {
         state.mode = parsed.mode === 'alliteration' ? 'alliteration' : 'rhyme';
         state.words = parsed.words;
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
+        state.syllableAltitude = !!parsed.syllableAltitude;
       }
     }
   } catch (e) { /* fresh start */ }
@@ -167,6 +170,7 @@ function buildGraphData() {
   // Cross-links for every non-grouping connection type with weight > 0
   for (const [typeName, type] of Object.entries(CONNECTION_TYPES)) {
     if (typeName === state.mode) continue;
+    if (typeName === 'syllables' && state.syllableAltitude) continue; // shown as altitude instead
     if (!(state.forceWeights[typeName] > 0)) continue;
     const buckets = new Map();
     for (const word of state.words) {
@@ -237,6 +241,48 @@ const keyLight = new THREE.PointLight(0xbfb0ff, 600, 0, 1.8);
 keyLight.position.set(120, 160, 220);
 scene.add(keyLight);
 
+// ===== Syllable altitude =====
+// Words float at a height set by their syllable count; guide rings mark strata.
+const STRATUM_SPACING = 60;
+const strataGroup = new THREE.Group();
+scene.add(strataGroup);
+
+function stratumY(syllables) {
+  return ((syllables || 1) - 2) * STRATUM_SPACING;
+}
+
+function applyAltitudeForce() {
+  if (state.syllableAltitude) {
+    Graph.d3Force('syllY',
+      forceY(n => n.type === 'word' ? stratumY(n.word.syllables) : 0)
+        .strength(n => n.type === 'word' ? 0.85 : 0));
+  } else {
+    Graph.d3Force('syllY', null);
+  }
+}
+
+function updateStrataGuides() {
+  strataGroup.clear();
+  if (!state.syllableAltitude || !state.words.length) return;
+
+  const counts = [...new Set(state.words.map(w => w.syllables || 1))].sort((a, b) => a - b);
+  for (const count of counts) {
+    const y = stratumY(count);
+    const points = [];
+    for (let i = 0; i <= 72; i++) {
+      const a = (i / 72) * Math.PI * 2;
+      points.push(new THREE.Vector3(Math.cos(a) * 135, y, Math.sin(a) * 135));
+    }
+    const ring = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      new THREE.LineBasicMaterial({ color: 0xff9ff5, transparent: true, opacity: 0.2 })
+    );
+    const label = new SpriteText(`${count} syllable${count > 1 ? 's' : ''}`, 5, 'rgba(255,159,245,0.8)');
+    label.position.set(152, y, 0);
+    strataGroup.add(ring, label);
+  }
+}
+
 function makeNodeObject(node) {
   const group = new THREE.Group();
 
@@ -295,6 +341,7 @@ function makeNodeObject(node) {
 function refreshGraph() {
   // graphData() reheats the simulation itself when the data changes
   Graph.graphData(buildGraphData());
+  updateStrataGuides();
   renderForcesPanel();
 }
 
@@ -487,14 +534,25 @@ function renderForcesPanel() {
 
   rows.innerHTML = Object.entries(CONNECTION_TYPES).map(([name, type]) => {
     const isGrouping = name === state.mode;
+    const isAltitude = name === 'syllables' && state.syllableAltitude;
     const value = Math.round((state.forceWeights[name] || 0) * 100);
+    const label = isAltitude ? `${type.label} ⛰` : `${type.label}${isGrouping ? ' ★' : ''}`;
+    const title = isGrouping ? 'currently the grouping — always strong'
+      : isAltitude ? 'shown as altitude instead of links' : '';
     return `
-      <div class="force-row ${isGrouping ? 'disabled' : ''}" title="${isGrouping ? 'currently the grouping — always strong' : ''}">
+      <div class="force-row ${isGrouping || isAltitude ? 'disabled' : ''}" title="${title}">
         <span class="swatch" style="background:${type.color}"></span>
-        <label>${type.label}${isGrouping ? ' ★' : ''}</label>
-        <input type="range" min="0" max="100" value="${isGrouping ? 100 : value}" data-type="${name}" ${isGrouping ? 'disabled' : ''}>
+        <label>${label}</label>
+        <input type="range" min="0" max="100" value="${isGrouping ? 100 : value}" data-type="${name}" ${isGrouping || isAltitude ? 'disabled' : ''}>
       </div>`;
-  }).join('');
+  }).join('') + `
+      <div class="force-row alt-row">
+        <span class="swatch" style="background:${CONNECTION_TYPES.syllables.color}; opacity:0.5"></span>
+        <label style="width:auto; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="altToggle" ${state.syllableAltitude ? 'checked' : ''}>
+          syllables as altitude
+        </label>
+      </div>`;
 
   rows.querySelectorAll('input[type="range"]').forEach(slider => {
     slider.addEventListener('input', () => {
@@ -502,6 +560,13 @@ function renderForcesPanel() {
       saveState();
       Graph.graphData(buildGraphData());
     });
+  });
+
+  rows.querySelector('#altToggle').addEventListener('change', e => {
+    state.syllableAltitude = e.target.checked;
+    saveState();
+    applyAltitudeForce();
+    refreshGraph();
   });
 }
 
@@ -557,6 +622,7 @@ initFromSeed().then(async seeded => {
   document.querySelectorAll('#modeToggle button').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === state.mode));
   if (!seeded) await backfillMeta();
+  applyAltitudeForce();
   refreshGraph();
   if (state.words.length) {
     setTimeout(() => Graph.zoomToFit(900, 70), 1200); // frame the poem once the layout settles
