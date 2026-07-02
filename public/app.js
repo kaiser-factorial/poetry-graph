@@ -56,7 +56,9 @@ function renderGraph() {
   const g = svg.append('g');
 
   // Create color scale based on word similarity
-  const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+  const colorScale = d3.scaleOrdinal([
+    '#b39554', '#6f82a8', '#7d8f7a', '#8f7a92', '#a8836f', '#8a8578', '#c2b28a', '#7a8a9e',
+  ]);
 
   // Draw links
   const link = g.selectAll('.link')
@@ -369,4 +371,4 @@ initGraph();
 fetchAllWords();
 
 // Add link to examples
-document.querySelector('header').innerHTML += '<br><a href="examples.html" style="color: white; text-decoration: none; opacity: 0.8;">📚 View Examples</a>';
+document.querySelector('header').innerHTML += '<br><a href="examples.html" style="color: white; text-decoration: none; opacity: 0.8;">View Examples</a>';

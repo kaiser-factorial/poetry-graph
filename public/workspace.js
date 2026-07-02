@@ -5,7 +5,7 @@
 
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1?external=three';
 import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
-import { forceY, forceCollide } from 'https://esm.sh/d3-force-3d@3';
+import { forceX, forceY, forceZ, forceCollide } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
 const API_URL = 'http://localhost:3001';
@@ -54,28 +54,33 @@ function localSyllables(word) {
 // Each type can group (hubs) and/or cross-link, with a force weight slider.
 const POS_NAMES = { n: 'noun', v: 'verb', adj: 'adjective', adv: 'adverb' };
 
+// Muted atlas palette: brass, slate, sage, mauve
 const CONNECTION_TYPES = {
   rhyme: {
     label: 'Rhyme',
-    color: '#ffd76e',
+    color: '#b39554',
     keyOf: w => w.rhymeKey || null,
   },
   alliteration: {
     label: 'Alliteration',
-    color: '#9fd8ff',
+    color: '#6f82a8',
     keyOf: w => w.onsetKey || null,
   },
   pos: {
     label: 'Same POS',
-    color: '#7effb2',
+    color: '#7d8f7a',
     keyOf: w => (w.pos && w.pos[0]) || null,
   },
   syllables: {
     label: 'Syllables',
-    color: '#ff9ff5',
+    color: '#8f7a92',
     keyOf: w => (w.syllables > 0 ? String(w.syllables) : null),
   },
 };
+
+const BONE = '#e8e2d3';
+const INK = '#0c0b10';
+const SERIF = '"Cormorant Garamond", serif';
 
 // ===== State =====
 let state = {
@@ -203,14 +208,14 @@ const container = document.querySelector('#graph3d');
 // Orbit controls (not trackball): the camera never rolls, so "up" is always
 // up — the stable frame of reference syllable altitude needs.
 const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
-  .backgroundColor('#14102b')
+  .backgroundColor(INK)
   .showNavInfo(false)
   .nodeThreeObject(node => makeNodeObject(node))
-  .linkColor(link => link.kind === 'member' ? 'rgba(255,255,255,0.7)' : CONNECTION_TYPES[link.kind].color)
-  .linkOpacity(0.45)
+  .linkColor(link => link.kind === 'member' ? 'rgba(232,226,211,0.6)' : CONNECTION_TYPES[link.kind].color)
+  .linkOpacity(0.55)
   .linkWidth(link => {
-    if (link.kind === 'member') return 0.5;
-    return 0.4 + (state.forceWeights[link.kind] || 0) * 1.4;
+    if (link.kind === 'member') return 0.4;
+    return 0.3 + (state.forceWeights[link.kind] || 0) * 0.9;
   })
   .onNodeClick(node => {
     if (node.type === 'plus') openAddPanel();
@@ -224,53 +229,35 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
 // Charge (repulsion) is set per-refresh, scaled to the number of words —
 // small poems stay compact, bigger ones get room to breathe.
 Graph.d3Force('link')
-  .distance(link => link.kind === 'member' ? 28 : 65)
+  .distance(link => link.kind === 'member' ? 24 : 50)
   .strength(link => {
     if (link.kind === 'member') return 0.9;
     return 0.35 * (state.forceWeights[link.kind] || 0);
   });
+Graph.d3Force('center').strength(0.14);
 Graph.d3Force('collide', forceCollide().radius(n => n.type === 'hub' ? 24 : 11));
 
+// The + node has no links, so raw repulsion would fling it away from the
+// poem — tether it gently near the poem's upper reaches instead.
+Graph.d3Force('plusX', forceX(0).strength(n => n.type === 'plus' ? 0.05 : 0));
+Graph.d3Force('plusZ', forceZ(0).strength(n => n.type === 'plus' ? 0.05 : 0));
+Graph.d3Force('plusY', forceY(70).strength(n => n.type === 'plus' ? 0.05 : 0));
+
 function scaledCharge() {
-  return -(30 + Math.min(state.words.length * 7, 110));
+  return -(15 + Math.min(state.words.length * 4, 65));
 }
 
-// Depth cues: fog + a sparse starfield + an extra light for specular pop
+// Depth cues: light fog + a faint field of warm-gray stars, like foxing on old paper
 const scene = Graph.scene();
-scene.fog = new THREE.FogExp2(0x14102b, 0.0008);
+scene.fog = new THREE.FogExp2(0x0c0b10, 0.0007);
 
 const starGeo = new THREE.BufferGeometry();
-const starPos = new Float32Array(900);
-for (let i = 0; i < starPos.length; i++) starPos[i] = (Math.random() - 0.5) * 2400;
+const starPos = new Float32Array(1500);
+for (let i = 0; i < starPos.length; i++) starPos[i] = (Math.random() - 0.5) * 2600;
 starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x5c50b8, size: 1.6, sizeAttenuation: true })));
-
-const keyLight = new THREE.PointLight(0xbfb0ff, 600, 0, 1.8);
-keyLight.position.set(120, 160, 220);
-scene.add(keyLight);
-
-// Distant nebulae: big soft additive glows far behind the poem
-function nebulaSprite(hex, size, x, y, z) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
-  g.addColorStop(0, `${hex}55`);
-  g.addColorStop(0.5, `${hex}22`);
-  g.addColorStop(1, `${hex}00`);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(c),
-    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
-  }));
-  sprite.scale.setScalar(size);
-  sprite.position.set(x, y, z);
-  return sprite;
-}
-scene.add(nebulaSprite('#7a5fd0', 900, -500, 250, -900));
-scene.add(nebulaSprite('#d05f9e', 700, 600, -200, -1100));
-scene.add(nebulaSprite('#4f7fd0', 550, 150, 420, -1000));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0x6e685c, size: 1.1, sizeAttenuation: true, transparent: true, opacity: 0.7,
+})));
 
 // ===== Syllable altitude =====
 // Words float at a height set by their syllable count; guide rings mark strata.
@@ -311,9 +298,10 @@ function updateStrataGuides() {
     }
     const ring = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({ color: 0xff9ff5, transparent: true, opacity: 0.2 })
+      new THREE.LineBasicMaterial({ color: 0xe8e2d3, transparent: true, opacity: 0.16 })
     );
-    const label = new SpriteText(`${count} syllable${count > 1 ? 's' : ''}`, 5, 'rgba(255,159,245,0.8)');
+    const label = new SpriteText(`${count} syllable${count > 1 ? 's' : ''}`, 5.4, 'rgba(232,226,211,0.6)');
+    label.fontFace = '"Inter", sans-serif';
     label.position.set(radius + 16, y, 0);
     strataGroup.add(ring, label);
   }
@@ -322,149 +310,115 @@ function updateStrataGuides() {
 // Re-measure the rings once the layout settles
 Graph.onEngineStop(() => { if (state.syllableAltitude) updateStrataGuides(); });
 
-// ===== Planetary rendering =====
-function hashOf(str) {
-  let h = 0;
-  for (const c of String(str)) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
+// ===== Etched-atlas rendering =====
+// Hubs are engraved circles (always facing the viewer, like a chart symbol);
+// words are the typography itself, anchored by a small point.
+
+function makeSprite(canvas, scale) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthWrite: false,
+  }));
+  sprite.scale.setScalar(scale);
+  return sprite;
 }
 
-// Banded gas-giant texture; hue is deterministic per group key
-const hubTextureCache = new Map();
-function gasGiantTexture(key) {
-  if (hubTextureCache.has(key)) return hubTextureCache.get(key);
-  const hue = 225 + (hashOf(key) % 95); // blue → purple → magenta family
+function hubSprite(label, r) {
+  const S = 512;
   const c = document.createElement('canvas');
-  c.width = 16; c.height = 128;
+  c.width = c.height = S;
   const ctx = c.getContext('2d');
-  for (let y = 0; y < c.height; y++) {
-    const band = Math.sin(y * 0.32 + hue) * 0.5 + Math.sin(y * 0.11 + hue * 2) * 0.5;
-    const light = 40 + band * 13 + (Math.random() - 0.5) * 5;
-    ctx.fillStyle = `hsl(${hue + band * 16}, ${58 + band * 10}%, ${light}%)`;
-    ctx.fillRect(0, y, c.width, 1);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  hubTextureCache.set(key, tex);
-  return tex;
-}
+  const cx = S / 2;
+  const R = S / 2 - 28;
 
-// Speckled moon texture, tinted by part of speech
-const MOON_HUES = { n: 42, v: 16, adj: 28, adv: 285 }; // gold, coral, peach, lavender
-const moonTextureCache = new Map();
-function moonTexture(word) {
-  const pos = word.pos?.[0];
-  const cacheKey = `${word.text}:${pos || '?'}`;
-  if (moonTextureCache.has(cacheKey)) return moonTextureCache.get(cacheKey);
-  const hue = MOON_HUES[pos] ?? 42;
-  const sat = pos ? 85 : 35;
-  const c = document.createElement('canvas');
-  c.width = 64; c.height = 32;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = `hsl(${hue}, ${sat}%, 64%)`;
-  ctx.fillRect(0, 0, c.width, c.height);
-  const craters = 14 + (hashOf(word.text) % 12);
-  for (let i = 0; i < craters; i++) {
-    ctx.fillStyle = `hsla(${hue}, ${sat}%, ${40 + Math.random() * 16}%, 0.5)`;
+  // engraved double circle
+  ctx.strokeStyle = 'rgba(238,232,218,1)';
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(cx, cx, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(232,226,211,0.3)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(cx, cx, R - 20, 0, Math.PI * 2); ctx.stroke();
+
+  // tick marks at the eighth points
+  ctx.strokeStyle = 'rgba(232,226,211,0.75)';
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
     ctx.beginPath();
-    ctx.arc(Math.random() * 64, Math.random() * 32, 0.8 + Math.random() * 2.6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(cx + Math.cos(a) * (R + 6), cx + Math.sin(a) * (R + 6));
+    ctx.lineTo(cx + Math.cos(a) * (R + 20), cx + Math.sin(a) * (R + 20));
+    ctx.stroke();
   }
-  const tex = new THREE.CanvasTexture(c);
-  moonTextureCache.set(cacheKey, tex);
-  return tex;
+
+  ctx.font = `600 158px ${SERIF}`;
+  ctx.fillStyle = 'rgba(238,232,218,1)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, cx + 10);
+
+  return makeSprite(c, r * 2.9);
 }
+
+function plusSpriteObj(empty) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const cx = S / 2;
+  ctx.strokeStyle = 'rgba(232,226,211,0.55)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 11]);
+  ctx.beginPath(); ctx.arc(cx, cx, cx - 10, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = `300 130px ${SERIF}`;
+  ctx.fillStyle = 'rgba(232,226,211,0.8)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+', cx, cx + 8);
+  const sprite = makeSprite(c, empty ? 28 : 17);
+  let t = Math.random() * Math.PI * 2;
+  sprite.onBeforeRender = () => {
+    t += 0.015;
+    sprite.material.opacity = 0.8 + Math.sin(t) * 0.18;
+  };
+  return sprite;
+}
+
+// Subtle ink tints by part of speech
+const POS_TINTS = { n: 0xe8e2d3, v: 0xd6bd8a, adj: 0xd8bfae, adv: 0xb4b8cb };
 
 function makeNodeObject(node) {
   const group = new THREE.Group();
 
   if (node.type === 'hub') {
-    const r = 11 + Math.min(node.memberCount * 1.6, 10);
-    const seed = hashOf(node.key);
-
-    const planet = new THREE.Mesh(
-      new THREE.SphereGeometry(r, 32, 32),
-      new THREE.MeshPhongMaterial({
-        map: gasGiantTexture(node.key),
-        transparent: true, opacity: 0.92,
-        emissive: 0x2a2258, emissiveIntensity: 0.5,
-        shininess: 35, specular: 0x8877cc,
-      })
-    );
-    planet.rotation.z = ((seed % 100) / 100 - 0.5) * 0.7; // axial tilt
-    planet.onBeforeRender = () => { planet.rotation.y += 0.0022; };
-
-    // atmosphere rim glow
-    const atmo = new THREE.Mesh(
-      new THREE.SphereGeometry(r * 1.22, 32, 32),
-      new THREE.MeshBasicMaterial({
-        color: 0x8b7ff0, transparent: true, opacity: 0.14,
-        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
-      })
-    );
-
-    // saturn ring
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(r * 1.5, r * 2.05, 56),
-      new THREE.MeshBasicMaterial({
-        color: 0xbfb0ff, transparent: true, opacity: 0.28,
-        side: THREE.DoubleSide, depthWrite: false,
-      })
-    );
-    ring.rotation.x = Math.PI / 2 - 0.32;
-    ring.rotation.y = ((seed % 37) / 37 - 0.5) * 0.5;
-    ring.onBeforeRender = () => { ring.rotation.z += 0.0011; };
-
-    const label = new SpriteText(node.label, 7, '#ffffff');
-    label.fontWeight = '700';
-    label.strokeColor = 'rgba(20,16,43,0.95)';
-    label.strokeWidth = 1.4;
-    label.position.y = r + 8;
-
-    group.add(planet, atmo, ring, label);
+    const r = 12 + Math.min(node.memberCount * 1.4, 9);
+    group.add(hubSprite(node.label, r));
     return group;
   }
 
   if (node.type === 'word') {
-    const r = 3.6 + Math.min(node.word.syllables || 1, 5) * 0.9; // moons grow with syllables
-    const moon = new THREE.Mesh(
-      new THREE.SphereGeometry(r, 24, 24),
-      new THREE.MeshPhongMaterial({
-        map: moonTexture(node.word),
-        emissive: 0x5a3c08, emissiveIntensity: 0.4,
-        shininess: 60, specular: 0xffeecc,
-      })
+    const r = 2.2 + Math.min(node.word.syllables || 1, 5) * 0.7;
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 16, 16),
+      new THREE.MeshBasicMaterial({ color: POS_TINTS[node.word.pos?.[0]] ?? 0x9b9588 })
     );
-    moon.onBeforeRender = () => { moon.rotation.y += 0.004; };
-    const label = new SpriteText(node.word.text, 5, '#ffffff');
+    const label = new SpriteText(node.word.text, 10, '#f2ede0');
+    label.fontFace = SERIF;
     label.fontWeight = '600';
-    label.strokeColor = 'rgba(20,16,43,0.9)';
-    label.strokeWidth = 1.4;
-    label.position.y = r + 6;
-    group.add(moon, label);
+    label.strokeColor = 'rgba(12,11,16,0.85)';
+    label.strokeWidth = 0.7;
+    label.position.y = r + 7.5;
+    group.add(dot, label);
     return group;
   }
 
-  // plus node: a little sun where new words are born
-  const r = node.empty ? 9 : 6;
-  const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(r, 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffe3a3 })
-  );
-  const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(r * 1.6, 24, 24),
-    new THREE.MeshBasicMaterial({
-      color: 0xffb347, transparent: true, opacity: 0.22,
-      side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
-    })
-  );
-  let t = Math.random() * Math.PI * 2;
-  halo.onBeforeRender = () => { t += 0.02; halo.scale.setScalar(1 + Math.sin(t) * 0.08); };
-  const sunLight = new THREE.PointLight(0xffd9a0, 220, 320, 1.9);
-  const label = new SpriteText('+', node.empty ? 8 : 5.5, 'rgba(90,60,10,0.95)');
-  group.add(sun, halo, sunLight, label);
+  // plus node
+  group.add(plusSpriteObj(node.empty));
   if (node.empty) {
-    const hint = new SpriteText('click to add your first word', 4, 'rgba(235,230,255,0.85)');
-    hint.position.y = -18;
+    const hint = new SpriteText('add your first word', 3.8, 'rgba(232,226,211,0.55)');
+    hint.fontFace = '"Inter", sans-serif';
+    hint.position.y = -19;
     group.add(hint);
   }
   return group;
@@ -671,7 +625,8 @@ function renderForcesPanel() {
     const isGrouping = name === state.mode;
     const isAltitude = name === 'syllables' && state.syllableAltitude;
     const value = Math.round((state.forceWeights[name] || 0) * 100);
-    const label = isAltitude ? `${type.label} ⛰` : `${type.label}${isGrouping ? ' ★' : ''}`;
+    const label = isAltitude ? `${type.label} <span class="mark">↕</span>`
+      : `${type.label}${isGrouping ? ' <span class="mark">◉</span>' : ''}`;
     const title = isGrouping ? 'currently the grouping — always strong'
       : isAltitude ? 'shown as altitude instead of links' : '';
     return `
@@ -753,14 +708,22 @@ async function initFromSeed() {
 }
 
 loadState();
-initFromSeed().then(async seeded => {
+// The serif renders into canvas sprites, so it must be loaded before first draw
+const fontsReady = Promise.all([
+  document.fonts.load(`500 116px ${SERIF}`),
+  document.fonts.load(`600 40px ${SERIF}`),
+  document.fonts.load('400 30px "Inter"'),
+]).catch(() => {});
+
+fontsReady.then(() => initFromSeed()).then(async seeded => {
   document.querySelectorAll('#modeToggle button').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === state.mode));
   if (!seeded) await backfillMeta();
   applyAltitudeForce();
   refreshGraph();
   if (state.words.length) {
-    setTimeout(() => Graph.zoomToFit(900, 70), 1200); // frame the poem once the layout settles
+    // frame the poem once the layout settles (the + node roams, so skip it)
+    setTimeout(() => Graph.zoomToFit(900, 40, n => n.type !== 'plus'), 1400);
   }
 });
 

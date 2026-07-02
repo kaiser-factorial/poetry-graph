@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poetry Graph — Poem Workspace</title>
+    <title>Poetry Graph — Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <script type="importmap">
     {
       "imports": {
@@ -16,11 +19,22 @@
     }
     </script>
     <style>
+        :root {
+            --ink: #0c0b10;
+            --surface: rgba(20, 19, 26, 0.88);
+            --bone: #e8e2d3;
+            --muted: #8f897c;
+            --brass: #b39554;
+            --hairline: rgba(232, 226, 211, 0.14);
+            --hairline-strong: rgba(232, 226, 211, 0.3);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #14102b;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--ink);
+            color: var(--bone);
             height: 100vh;
             display: flex;
             flex-direction: column;
@@ -28,60 +42,80 @@
         }
 
         header {
-            background: rgba(255, 255, 255, 0.06);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            color: white;
-            padding: 12px 20px;
+            border-bottom: 1px solid var(--hairline);
+            padding: 14px 24px;
             display: flex;
-            align-items: center;
+            align-items: baseline;
             justify-content: space-between;
             gap: 16px;
             flex-wrap: wrap;
             z-index: 10;
+            background: var(--ink);
         }
 
-        header h1 { font-size: 1.4em; font-weight: 600; }
-        header a { color: white; opacity: 0.7; text-decoration: none; font-size: 0.9em; }
-        header a:hover { opacity: 1; }
-
-        .toolbar { display: flex; align-items: center; gap: 12px; }
-
-        .mode-toggle {
-            display: flex;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 3px;
+        header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.55em;
+            font-weight: 500;
+            letter-spacing: 0.02em;
         }
+
+        header h1 .sub {
+            color: var(--muted);
+            font-style: italic;
+            font-weight: 500;
+        }
+
+        header a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            transition: color 0.2s;
+        }
+
+        header a:hover { color: var(--bone); }
+
+        .toolbar { display: flex; align-items: baseline; gap: 22px; }
+
+        .mode-toggle { display: flex; gap: 18px; }
 
         .mode-toggle button {
             border: none;
             background: transparent;
-            color: white;
-            padding: 7px 16px;
-            border-radius: 17px;
+            color: var(--muted);
+            padding: 2px 0 5px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            border-bottom: 1px solid transparent;
             transition: all 0.25s ease;
         }
 
         .mode-toggle button.active {
-            background: #8b7ff0;
-            color: white;
-            font-weight: 600;
+            color: var(--bone);
+            border-bottom-color: var(--brass);
         }
 
+        .mode-toggle button:hover { color: var(--bone); }
+
         .toolbar .button {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            padding: 7px 14px;
-            border-radius: 17px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--hairline);
+            padding: 6px 14px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
             transition: all 0.25s ease;
         }
 
-        .toolbar .button:hover { background: rgba(255, 255, 255, 0.22); }
+        .toolbar .button:hover { color: var(--bone); border-color: var(--hairline-strong); }
 
         main { flex: 1; position: relative; overflow: hidden; }
 
@@ -90,172 +124,194 @@
         /* Side panel */
         .panel {
             position: absolute;
-            top: 16px;
-            right: 16px;
+            top: 20px;
+            right: 20px;
             width: 300px;
-            max-height: calc(100% - 32px);
-            background: rgba(24, 19, 48, 0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+            max-height: calc(100% - 40px);
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--hairline);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            color: #e8e5ff;
             z-index: 5;
         }
 
         .panel-header {
-            padding: 14px 16px;
-            background: rgba(139, 127, 240, 0.15);
+            padding: 14px 18px 12px;
+            border-bottom: 1px solid var(--hairline);
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: baseline;
         }
 
-        .panel-header h2 { font-size: 1.05em; color: #b7aefc; }
+        .panel-header h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.25em;
+            font-weight: 500;
+            font-style: italic;
+        }
 
         .panel-close {
             border: none;
             background: transparent;
-            font-size: 1.1em;
+            font-size: 0.95em;
             cursor: pointer;
-            color: #9a93c9;
+            color: var(--muted);
         }
 
-        .panel-body { padding: 14px 16px; overflow-y: auto; }
+        .panel-close:hover { color: var(--bone); }
+
+        .panel-body { padding: 16px 18px; overflow-y: auto; }
 
         .panel-body h3 {
-            font-size: 0.72em;
+            font-size: 0.62rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #8b7ff0;
-            margin: 14px 0 7px;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            margin: 16px 0 8px;
+            font-weight: 500;
         }
 
         .panel-body h3:first-child { margin-top: 0; }
 
-        .add-input { display: flex; gap: 6px; }
+        .add-input { display: flex; gap: 8px; }
 
         .add-input input {
             flex: 1;
             padding: 8px 10px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(139, 127, 240, 0.6);
-            border-radius: 6px;
-            font-size: 0.95em;
-            color: white;
+            background: transparent;
+            border: 1px solid var(--hairline-strong);
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.05rem;
+            color: var(--bone);
         }
 
-        .add-input input::placeholder { color: #8d86bb; }
+        .add-input input:focus { outline: none; border-color: var(--brass); }
+        .add-input input::placeholder { color: var(--muted); font-style: italic; }
 
         .add-input button {
-            background: #8b7ff0;
-            border: none;
-            color: white;
-            border-radius: 6px;
-            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid var(--hairline-strong);
+            color: var(--bone);
+            padding: 8px 14px;
             cursor: pointer;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
         }
+
+        .add-input button:hover { border-color: var(--brass); color: var(--brass); }
 
         .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
         .chip {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #d9d5f5;
-            border-radius: 14px;
-            padding: 4px 10px;
-            font-size: 0.85em;
+            background: transparent;
+            border: 1px solid var(--hairline);
+            color: var(--bone);
+            padding: 3px 11px 4px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1rem;
             cursor: pointer;
             transition: all 0.15s ease;
         }
 
-        .chip:hover { background: #8b7ff0; color: white; }
+        .chip:hover { border-color: var(--brass); color: var(--brass); }
 
-        .chip.member { background: rgba(255, 205, 100, 0.2); border-color: rgba(255, 205, 100, 0.5); color: #ffd76e; }
-        .chip.member .x { margin-left: 5px; opacity: 0.6; font-weight: bold; }
-        .chip.member:hover { background: rgba(224, 101, 101, 0.7); border-color: #c94f4f; color: white; }
+        .chip.member { border-color: rgba(179, 149, 84, 0.55); color: var(--brass); }
+        .chip.member .x { margin-left: 6px; opacity: 0.5; font-size: 0.8em; }
+        .chip.member:hover { border-color: #a05555; color: #c98080; }
 
-        .chip .meta { opacity: 0.55; font-size: 0.85em; margin-left: 4px; }
+        .chip .meta {
+            opacity: 0.5;
+            font-size: 0.72em;
+            margin-left: 4px;
+            font-family: 'Inter', sans-serif;
+        }
 
-        .muted { color: #79719f; font-size: 0.85em; font-style: italic; }
+        .muted { color: var(--muted); font-size: 0.82em; font-style: italic; }
 
         /* Forces panel */
         .forces {
             position: absolute;
-            left: 16px;
-            bottom: 16px;
-            width: 274px;
-            background: rgba(24, 19, 48, 0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
-            padding: 12px 14px;
-            color: #e8e5ff;
+            left: 20px;
+            bottom: 20px;
+            width: 270px;
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--hairline);
+            padding: 14px 16px;
             z-index: 5;
         }
 
         .forces h3 {
-            font-size: 0.72em;
+            font-size: 0.62rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #8b7ff0;
-            margin-bottom: 10px;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            margin-bottom: 12px;
+            font-weight: 500;
         }
 
         .force-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin: 7px 0;
-            font-size: 0.82em;
+            gap: 10px;
+            margin: 8px 0;
+            font-size: 0.78rem;
         }
 
-        .force-row.disabled { opacity: 0.35; pointer-events: none; }
+        .force-row.disabled { opacity: 0.32; pointer-events: none; }
 
         .force-row .swatch {
-            width: 14px;
-            height: 3px;
-            border-radius: 2px;
+            width: 16px;
+            height: 1px;
             flex-shrink: 0;
         }
 
-        .force-row label { width: 92px; flex-shrink: 0; white-space: nowrap; }
+        .force-row label {
+            width: 96px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            color: var(--bone);
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+        }
+
+        .force-row label .mark { color: var(--muted); font-size: 0.85em; }
 
         .force-row input[type="range"] {
             flex: 1;
-            accent-color: #8b7ff0;
-            height: 3px;
+            accent-color: var(--brass);
+            height: 2px;
         }
 
-        .force-row input[type="checkbox"] { accent-color: #ff9ff5; }
+        .force-row input[type="checkbox"] { accent-color: var(--brass); }
 
         .force-row.alt-row {
-            margin-top: 10px;
-            padding-top: 9px;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 12px;
+            padding-top: 11px;
+            border-top: 1px solid var(--hairline);
         }
 
         .forces .hint {
-            font-size: 0.7em;
-            color: #79719f;
-            margin-top: 8px;
-            line-height: 1.4;
+            font-size: 0.64rem;
+            color: var(--muted);
+            margin-top: 10px;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>✍️ Poem Workspace</h1>
+        <h1>Poetry Graph <span class="sub">— workspace</span></h1>
         <div class="toolbar">
             <div class="mode-toggle" id="modeToggle">
-                <button data-mode="rhyme" class="active">🎵 Rhyme</button>
-                <button data-mode="alliteration">🅰️ Alliteration</button>
+                <button data-mode="rhyme" class="active">Rhyme</button>
+                <button data-mode="alliteration">Alliteration</button>
             </div>
-            <button class="button" id="newPoemBtn">＋ New Poem</button>
-            <a href="index.html">← Explorer</a>
+            <button class="button" id="newPoemBtn">New Poem</button>
+            <a href="index.html">Explorer</a>
         </div>
     </header>
 
@@ -271,12 +327,12 @@
         </div>
 
         <div class="forces" id="forces" style="display: none;">
-            <h3>Connection forces</h3>
+            <h3>Connection Forces</h3>
             <div id="forceRows"></div>
-            <div class="hint">Drag sliders to control how strongly each relationship pulls words together. Drag spheres · scroll to zoom · right-drag to pan.</div>
+            <div class="hint">Sliders set how strongly each relationship pulls words together. Drag words · scroll to zoom · right-drag to pan.</div>
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=5"></script>
+    <script type="module" src="workspace.js?v=6"></script>
 </body>
 </html>

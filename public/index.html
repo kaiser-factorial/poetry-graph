@@ -4,8 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Poetry Graph</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+        h1, h2 { font-family: 'Cormorant Garamond', serif; font-weight: 500; }
+
+        input, select {
+            background: #1c1b23 !important;
+            color: #e8e2d3 !important;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,8 +23,8 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', sans-serif; color: #e8e2d3;
+            background: #0c0b10;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -49,7 +59,7 @@
 
         .graph-container {
             flex: 1;
-            background: white;
+            background: #14131a; border: 1px solid rgba(232,226,211,0.14);
             border-radius: 10px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             overflow: hidden;
@@ -63,7 +73,7 @@
 
         .node {
             cursor: pointer;
-            stroke: white;
+            stroke: #e8e2d3;
             stroke-width: 2px;
         }
 
@@ -72,7 +82,7 @@
         }
 
         .node.selected {
-            stroke: #ffd700;
+            stroke: #b39554;
             stroke-width: 3px;
         }
 
@@ -93,7 +103,7 @@
 
         .sidebar {
             width: 350px;
-            background: white;
+            background: #14131a; border: 1px solid rgba(232,226,211,0.14);
             border-radius: 10px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             display: flex;
@@ -108,7 +118,7 @@
         }
 
         .sidebar h2 {
-            color: #667eea;
+            color: #b39554;
             margin-bottom: 15px;
             font-size: 1.5em;
         }
@@ -120,14 +130,14 @@
         .search-box input {
             width: 100%;
             padding: 10px;
-            border: 2px solid #667eea;
+            border: 2px solid #b39554;
             border-radius: 5px;
             font-size: 1em;
         }
 
         .search-box input:focus {
             outline: none;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 0 10px rgba(179, 149, 84, 0.5);
         }
 
         .word-section {
@@ -135,12 +145,12 @@
         }
 
         .word-section h3 {
-            color: #764ba2;
+            color: #8f897c;
             font-size: 1em;
             margin-bottom: 10px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid #b39554;
             padding-bottom: 8px;
         }
 
@@ -151,7 +161,7 @@
         .word-item {
             padding: 8px 12px;
             margin: 5px 0;
-            background: #f5f5f5;
+            background: #1c1b23;
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -159,14 +169,14 @@
         }
 
         .word-item:hover {
-            background: #e8e8ff;
-            border-left-color: #667eea;
+            background: #242230;
+            border-left-color: #b39554;
         }
 
         .word-item.highlight {
-            background: #667eea;
+            background: #b39554;
             color: white;
-            border-left-color: #764ba2;
+            border-left-color: #8f897c;
         }
 
         .similarity-score {
@@ -176,13 +186,13 @@
         }
 
         .poem-section {
-            border-top: 2px solid #667eea;
+            border-top: 2px solid #b39554;
             padding-top: 15px;
             margin-top: 20px;
         }
 
         .poem-section h3 {
-            color: #764ba2;
+            color: #8f897c;
             font-size: 1em;
             margin-bottom: 10px;
             text-transform: uppercase;
@@ -190,19 +200,19 @@
         }
 
         .poem-text {
-            background: #f5f5f5;
+            background: #1c1b23;
             padding: 15px;
             border-radius: 5px;
             line-height: 1.8;
             font-style: italic;
-            color: #333;
+            color: #e8e2d3;
             white-space: pre-wrap;
             word-wrap: break-word;
             font-size: 0.95em;
         }
 
         .button {
-            background: #667eea;
+            background: #b39554;
             color: white;
             border: none;
             padding: 10px 15px;
@@ -215,15 +225,15 @@
         }
 
         .button:hover {
-            background: #764ba2;
+            background: #8f897c;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(179, 149, 84, 0.4);
         }
 
         .loading {
             text-align: center;
             padding: 20px;
-            color: #667eea;
+            color: #b39554;
         }
 
         @media (max-width: 1000px) {
@@ -239,9 +249,9 @@
 </head>
 <body>
     <header>
-        <h1>🌙 Poetry Graph</h1>
-        <p class="subtitle">Map semantic and phonetic relationships between words</p>
-        <a href="workspace.html" style="display: inline-block; margin-top: 10px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; padding: 8px 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.5);">✍️ Start a New Poem</a>
+        <h1>Poetry Graph</h1>
+        <p class="subtitle" style="color: #8f897c; font-style: italic;">map semantic and phonetic relationships between words</p>
+        <a href="workspace.html" style="display: inline-block; margin-top: 12px; color: #e8e2d3; text-decoration: none; padding: 7px 18px; border: 1px solid rgba(232,226,211,0.3); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.14em;">Start a New Poem</a>
     </header>
 
     <main>
@@ -253,15 +263,15 @@
             <div class="sidebar-content">
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="Search or add words...">
-                    <small style="color: #999; display: block; margin-top: 5px;">Separate words with commas or spaces</small>
+                    <small style="color: #8f897c; display: block; margin-top: 5px;">Separate words with commas or spaces</small>
                 </div>
 
-                <div class="word-section" id="statsSection" style="background: #f0f4ff; padding: 12px; border-radius: 5px; margin-bottom: 15px;">
+                <div class="word-section" id="statsSection" style="background: #1c1b23; padding: 12px; border-radius: 5px; margin-bottom: 15px;">
                     <h3 style="font-size: 0.9em; margin-bottom: 8px;">Graph Stats</h3>
-                    <div style="font-size: 0.85em; line-height: 1.6; color: #666;">
-                        <div>📊 Words: <span id="wordCount">0</span></div>
-                        <div>🔗 Connections: <span id="linkCount">0</span></div>
-                        <div>⭐ Selected: <span id="selectedWord">None</span></div>
+                    <div style="font-size: 0.85em; line-height: 1.6; color: #8f897c;">
+                        <div>Words: <span id="wordCount">0</span></div>
+                        <div>Connections: <span id="linkCount">0</span></div>
+                        <div>Selected: <span id="selectedWord">None</span></div>
                     </div>
                 </div>
 
@@ -282,7 +292,7 @@
 
                 <div class="word-section">
                     <h3>Poem Type</h3>
-                    <select id="poemStyleSelect" style="width: 100%; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 0.9em;">
+                    <select id="poemStyleSelect" style="width: 100%; padding: 8px; border: 2px solid #b39554; border-radius: 5px; font-size: 0.9em;">
                         <option value="short">Short Verse</option>
                         <option value="verse">Verse</option>
                         <option value="haiku">Haiku (5-7-5)</option>
