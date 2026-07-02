@@ -7,7 +7,16 @@ let allWords = [];
 
 async function initGraph() {
   try {
-    const response = await fetch(`${API_URL}/api/graph`);
+    // Start light: a small sample the user can grow word by word
+    const wordsRes = await fetch(`${API_URL}/api/words`);
+    const { words } = await wordsRes.json();
+    const sample = [...words].sort(() => Math.random() - 0.5).slice(0, 12);
+
+    const response = await fetch(`${API_URL}/api/graph`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ words: sample }),
+    });
     graphData = await response.json();
     renderGraph();
     updateWordList();
@@ -74,7 +83,7 @@ function renderGraph() {
     .enter()
     .append('circle')
     .attr('class', 'node')
-    .attr('r', 20)
+    .attr('r', 8)
     .attr('fill', (d, i) => colorScale(i % 10))
     .attr('cx', d => d.x)
     .attr('cy', d => d.y)
@@ -84,7 +93,7 @@ function renderGraph() {
       .on('drag', dragged)
       .on('end', dragEnded));
 
-  // Draw labels
+  // Draw labels — the full word, set in serif above each point
   const label = g.selectAll('.node-label')
     .data(graphData.nodes)
     .enter()
@@ -92,7 +101,8 @@ function renderGraph() {
     .attr('class', 'node-label')
     .attr('x', d => d.x)
     .attr('y', d => d.y)
-    .text(d => d.word.substring(0, 1).toUpperCase())
+    .attr('dy', -14)
+    .text(d => d.word)
     .style('pointer-events', 'none');
 
   // Add zoom
@@ -118,7 +128,7 @@ function renderGraph() {
 
     label
       .attr('x', d => d.x)
-      .attr('y', d => d.y);
+      .attr('y', d => d.y - 2);
 
     if (running && iteration < 200) {
       iteration++;
@@ -326,6 +336,11 @@ async function addCustomWords(customWords) {
 
   if (words.length === 0) return;
 
+  // Typed words join the canvas rather than replacing it
+  if (!customWords && graphData) {
+    words = [...new Set([...graphData.nodes.map(n => n.word), ...words])];
+  }
+
   try {
     const response = await fetch(`${API_URL}/api/graph`, {
       method: 'POST',
@@ -353,6 +368,12 @@ document.querySelector('#searchInput').addEventListener('keypress', (e) => {
 
 document.querySelector('#poemBtn').addEventListener('click', generatePoem);
 document.querySelector('#resetBtn').addEventListener('click', resetGraph);
+
+document.querySelector('#toWorkspaceBtn').addEventListener('click', () => {
+  const words = graphData ? graphData.nodes.map(n => n.word) : [];
+  if (!words.length) return;
+  window.location.href = `workspace.html?seed=${encodeURIComponent(words.join(','))}`;
+});
 
 // Check for example words in localStorage
 const savedWords = localStorage.getItem('selectedWords');

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poetry Graph — Forms</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #0c0b10;
+            --surface: #14131a;
+            --bone: #e8e2d3;
+            --muted: #8f897c;
+            --brass: #b39554;
+            --slate: #6f82a8;
+            --sage: #7d8f7a;
+            --mauve: #8f7a92;
+            --clay: #a8836f;
+            --hairline: rgba(232, 226, 211, 0.14);
+            --hairline-strong: rgba(232, 226, 211, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--ink);
+            color: var(--bone);
+            min-height: 100vh;
+        }
+
+        header {
+            border-bottom: 1px solid var(--hairline);
+            padding: 14px 24px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            background: var(--ink);
+            z-index: 10;
+        }
+
+        header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.55em;
+            font-weight: 500;
+        }
+
+        header h1 .sub { color: var(--muted); font-style: italic; }
+
+        header nav { display: flex; gap: 22px; align-items: baseline; }
+
+        header a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+        }
+
+        header a:hover { color: var(--bone); }
+
+        .layout {
+            display: flex;
+            max-width: 1060px;
+            margin: 0 auto;
+            gap: 48px;
+            padding: 40px 24px 80px;
+        }
+
+        .toc {
+            width: 170px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 90px;
+            align-self: flex-start;
+        }
+
+        .toc h2 {
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            margin-bottom: 14px;
+            font-weight: 500;
+        }
+
+        .toc a {
+            display: block;
+            color: var(--muted);
+            text-decoration: none;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            padding: 4px 0;
+            border-left: 1px solid var(--hairline);
+            padding-left: 14px;
+            transition: all 0.2s;
+        }
+
+        .toc a:hover { color: var(--bone); border-left-color: var(--brass); }
+
+        .content { flex: 1; min-width: 0; }
+
+        .intro {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.25rem;
+            font-style: italic;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 48px;
+            max-width: 560px;
+        }
+
+        section {
+            margin-bottom: 64px;
+            padding-top: 12px;
+        }
+
+        section h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .at-a-glance {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            margin-bottom: 16px;
+        }
+
+        section p {
+            line-height: 1.75;
+            font-size: 0.92rem;
+            color: #cfc9bb;
+            max-width: 600px;
+            margin-bottom: 16px;
+        }
+
+        section p em { color: var(--bone); }
+
+        .scheme {
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            padding: 18px 20px;
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .stanza { display: flex; flex-direction: column; gap: 5px; }
+
+        .stanza-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            margin-bottom: 3px;
+        }
+
+        .line { display: flex; align-items: center; gap: 8px; }
+
+        .line .n {
+            font-size: 0.62rem;
+            color: var(--muted);
+            width: 18px;
+            text-align: right;
+        }
+
+        .r {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 600;
+            font-size: 1.05rem;
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid;
+        }
+
+        .rA { color: var(--brass); border-color: var(--brass); }
+        .rB { color: var(--slate); border-color: var(--slate); }
+        .rC { color: var(--sage); border-color: var(--sage); }
+        .rD { color: var(--mauve); border-color: var(--mauve); }
+        .rE { color: var(--clay); border-color: var(--clay); }
+        .rF { color: #9e9a8a; border-color: #9e9a8a; }
+        .rG { color: #c2b28a; border-color: #c2b28a; }
+        .rX { color: #5c574d; border-color: #3a372f; }
+
+        .refrain {
+            font-size: 0.62rem;
+            color: var(--brass);
+            letter-spacing: 0.08em;
+        }
+
+        .syl {
+            font-size: 0.62rem;
+            color: var(--muted);
+        }
+
+        .graph-tip {
+            border-left: 2px solid var(--brass);
+            background: rgba(179, 149, 84, 0.06);
+            padding: 14px 18px;
+            margin-top: 18px;
+            max-width: 600px;
+        }
+
+        .graph-tip .tip-label {
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--brass);
+            margin-bottom: 7px;
+        }
+
+        .graph-tip p { margin-bottom: 0; font-size: 0.88rem; }
+
+        .graph-tip .node-ref {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 600;
+            padding: 0 3px;
+        }
+
+        .n1 { color: var(--brass); }
+        .n2 { color: var(--slate); }
+        .n3 { color: var(--sage); }
+
+        .sestina-table {
+            border-collapse: collapse;
+            margin: 4px 0;
+        }
+
+        .sestina-table td, .sestina-table th {
+            border: 1px solid var(--hairline);
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .sestina-table th {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .sestina-table td { font-family: 'Cormorant Garamond', serif; font-size: 1rem; }
+
+        .try-link {
+            display: inline-block;
+            margin-top: 14px;
+            color: var(--bone);
+            text-decoration: none;
+            padding: 7px 16px;
+            border: 1px solid var(--hairline-strong);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .try-link:hover { border-color: var(--brass); color: var(--brass); }
+
+        @media (max-width: 800px) {
+            .toc { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Poetry Graph <span class="sub">— forms</span></h1>
+        <nav>
+            <a href="workspace.html">Workspace</a>
+            <a href="index.html">Explorer</a>
+        </nav>
+    </header>
+
+    <div class="layout">
+        <aside class="toc">
+            <h2>Forms</h2>
+            <a href="#villanelle">Villanelle</a>
+            <a href="#sestina">Sestina</a>
+            <a href="#sonnet">Sonnet</a>
+            <a href="#ballad">Ballad</a>
+            <a href="#limerick">Limerick</a>
+            <a href="#triolet">Triolet</a>
+            <a href="#haiku">Haiku</a>
+        </aside>
+
+        <div class="content">
+            <p class="intro">A field guide to the fixed forms — what each one asks of you,
+            and how to gather its materials from your graph before you write a line.</p>
+
+            <section id="villanelle">
+                <h2>Villanelle</h2>
+                <div class="at-a-glance">19 lines · 2 rhymes · 2 refrains · 5 tercets + 1 quatrain</div>
+                <p>The villanelle is an obsession machine. Two whole lines — the <em>refrains</em> —
+                return again and again, alternating as the final line of each tercet, until they
+                collide as the closing couplet. Because only two rhyme sounds carry all nineteen
+                lines, the form circles its subject relentlessly ("Do not go gentle into that good
+                night" is the famous one).</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">Tercet 1</div>
+                        <div class="line"><span class="n">1</span><span class="r rA">A</span><span class="refrain">refrain 1</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rA">A</span><span class="refrain">refrain 2</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Tercet 2</div>
+                        <div class="line"><span class="n">4</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">5</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">6</span><span class="r rA">A</span><span class="refrain">refrain 1</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Tercet 3</div>
+                        <div class="line"><span class="n">7</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">8</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">9</span><span class="r rA">A</span><span class="refrain">refrain 2</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Tercets 4–5</div>
+                        <div class="line"><span class="n">…</span><span class="r rA">A</span><span class="refrain">same pattern</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Quatrain</div>
+                        <div class="line"><span class="n">16</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">17</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">18</span><span class="r rA">A</span><span class="refrain">refrain 1</span></div>
+                        <div class="line"><span class="n">19</span><span class="r rA">A</span><span class="refrain">refrain 2</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>Pick <span class="node-ref n1">two rhyme nodes</span>. Your
+                    <span class="node-ref n1">A node</span> does the heavy lifting: it needs your two
+                    refrain end-words plus five more distinct rhymes (13 A-lines total, but the refrains
+                    repeat). The <span class="node-ref n2">B node</span> needs six words. Open a rich
+                    node like <em>-ight</em> or <em>-one</em> and harvest before you draft.</p>
+                </div>
+                <a class="try-link" href="workspace.html">gather words for one →</a>
+            </section>
+
+            <section id="sestina">
+                <h2>Sestina</h2>
+                <div class="at-a-glance">39 lines · no rhyme · 6 end-words · 6 sestets + 1 envoi</div>
+                <p>The sestina doesn't rhyme at all — instead it repeats the same six
+                <em>end-words</em>, reordered stanza by stanza through a fixed spiral called
+                <em>retrogradatio cruciata</em>: each new stanza takes the previous order and folds
+                it outside-in (last, first, second-to-last, second…). After six stanzas every word
+                has held every position; a three-line envoi then uses all six at once.</p>
+                <div class="scheme" style="display: block;">
+                    <table class="sestina-table">
+                        <tr><th>Stanza</th><th colspan="6">End-word order</th></tr>
+                        <tr><td>1</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td></tr>
+                        <tr><td>2</td><td>6</td><td>1</td><td>5</td><td>2</td><td>4</td><td>3</td></tr>
+                        <tr><td>3</td><td>3</td><td>6</td><td>4</td><td>1</td><td>2</td><td>5</td></tr>
+                        <tr><td>4</td><td>5</td><td>3</td><td>2</td><td>6</td><td>1</td><td>4</td></tr>
+                        <tr><td>5</td><td>4</td><td>5</td><td>1</td><td>3</td><td>6</td><td>2</td></tr>
+                        <tr><td>6</td><td>2</td><td>4</td><td>6</td><td>5</td><td>3</td><td>1</td></tr>
+                        <tr><td>envoi</td><td colspan="6">2 per line: 2–5 · 4–3 · 6–1</td></tr>
+                    </table>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>Rhyme doesn't matter here — <em>meaning does</em>. Choose six words from
+                    <span class="node-ref n3">different rhyme nodes</span> that can bend into many
+                    senses (words with several parts of speech shine — check the tint of each point).
+                    Words like <em>light</em>, <em>still</em>, or <em>ground</em> survive 7
+                    repetitions; rarities wear out by stanza 3.</p>
+                </div>
+                <a class="try-link" href="workspace.html?seed=light,still,ground,turn,glass,cold">seed six workable end-words →</a>
+            </section>
+
+            <section id="sonnet">
+                <h2>Sonnet <span style="font-size: 0.6em; color: var(--muted); font-style: italic;">(Shakespearean)</span></h2>
+                <div class="at-a-glance">14 lines · 7 rhymes · iambic pentameter · 3 quatrains + couplet</div>
+                <p>Fourteen lines of iambic pentameter (ten syllables, da-DUM ×5). Three quatrains
+                develop an idea in alternating rhyme; the final couplet lands the twist — the
+                <em>volta</em> traditionally strikes at line 9 or in that last pair. Each rhyme
+                sound is used exactly twice, so no single node is strained.</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">Quatrain 1</div>
+                        <div class="line"><span class="n">1</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">4</span><span class="r rB">B</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Quatrain 2</div>
+                        <div class="line"><span class="n">5</span><span class="r rC">C</span></div>
+                        <div class="line"><span class="n">6</span><span class="r rD">D</span></div>
+                        <div class="line"><span class="n">7</span><span class="r rC">C</span></div>
+                        <div class="line"><span class="n">8</span><span class="r rD">D</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Quatrain 3</div>
+                        <div class="line"><span class="n">9</span><span class="r rE">E</span></div>
+                        <div class="line"><span class="n">10</span><span class="r rF">F</span></div>
+                        <div class="line"><span class="n">11</span><span class="r rE">E</span></div>
+                        <div class="line"><span class="n">12</span><span class="r rF">F</span></div>
+                    </div>
+                    <div class="stanza"><div class="stanza-label">Couplet</div>
+                        <div class="line"><span class="n">13</span><span class="r rG">G</span></div>
+                        <div class="line"><span class="n">14</span><span class="r rG">G</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>You need <span class="node-ref n1">seven rhyme nodes with two words each</span> —
+                    breadth over depth. Save your strongest pair for the
+                    <span class="node-ref n1">G couplet</span>: it's the poem's last word. For the
+                    pentameter, flip on <em>syllables as altitude</em> and shop by floor as you fill
+                    each ten-syllable line.</p>
+                </div>
+                <a class="try-link" href="workspace.html">collect seven pairs →</a>
+            </section>
+
+            <section id="ballad">
+                <h2>Ballad</h2>
+                <div class="at-a-glance">quatrains · ABCB · alternating 8 / 6 syllables · any length</div>
+                <p>The ballad is poetry's storytelling engine — folk tales, murder ballads, sea
+                songs. Quatrains alternate four-beat and three-beat lines (roughly 8 and 6
+                syllables), and only lines two and four need to rhyme, which keeps the narrative
+                moving fast. A <em>refrain</em> stanza often returns like a chorus.</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">Each stanza</div>
+                        <div class="line"><span class="n">1</span><span class="r rX">×</span><span class="syl">~8 syllables — no rhyme needed</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rB">B</span><span class="syl">~6 syllables</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rX">×</span><span class="syl">~8 syllables — no rhyme needed</span></div>
+                        <div class="line"><span class="n">4</span><span class="r rB">B</span><span class="syl">~6 syllables</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>Light lifting: <span class="node-ref n2">one rhyme pair per stanza</span>, a fresh
+                    node each time. The real constraint is the beat — turn on <em>syllables as
+                    altitude</em> and pull line-ending words from the lower floors (1–2 syllables
+                    land the stress cleanly at line's end).</p>
+                </div>
+                <a class="try-link" href="workspace.html">start a stanza →</a>
+            </section>
+
+            <section id="limerick">
+                <h2>Limerick</h2>
+                <div class="at-a-glance">5 lines · AABBA · anapestic bounce · disreputable</div>
+                <p>Five lines, two rhymes, and a punchline. Lines 1, 2, and 5 are long (three
+                beats, 8–9 syllables) and rhyme together; lines 3 and 4 are short (two beats, 5–6
+                syllables) and rhyme with each other. The engine is the <em>anapest</em> —
+                da-da-DUM — which is why limericks gallop.</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">The five</div>
+                        <div class="line"><span class="n">1</span><span class="r rA">A</span><span class="syl">8–9 syllables</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rA">A</span><span class="syl">8–9 syllables</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rB">B</span><span class="syl">5–6 syllables</span></div>
+                        <div class="line"><span class="n">4</span><span class="r rB">B</span><span class="syl">5–6 syllables</span></div>
+                        <div class="line"><span class="n">5</span><span class="r rA">A</span><span class="syl">8–9 syllables — the punchline</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p><span class="node-ref n1">Node 1 needs three words</span>,
+                    <span class="node-ref n2">node 2 needs two</span>. The trick: pick your line-5
+                    punchline word <em>first</em>, then work backwards — expand its node and choose
+                    lines 1 and 2 from what you find there.</p>
+                </div>
+                <a class="try-link" href="workspace.html">find a punchline →</a>
+            </section>
+
+            <section id="triolet">
+                <h2>Triolet</h2>
+                <div class="at-a-glance">8 lines · 2 rhymes · line 1 appears three times</div>
+                <p>A miniature music box. Eight lines, but only about five of them are yours to
+                write: line 1 returns as lines 4 and 7, and line 2 returns as line 8. The art is
+                choosing a first line whose meaning <em>shifts</em> each time it comes back around.</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">The eight</div>
+                        <div class="line"><span class="n">1</span><span class="r rA">A</span><span class="refrain">refrain a</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rB">B</span><span class="refrain">refrain b</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">4</span><span class="r rA">A</span><span class="refrain">refrain a again</span></div>
+                        <div class="line"><span class="n">5</span><span class="r rA">A</span></div>
+                        <div class="line"><span class="n">6</span><span class="r rB">B</span></div>
+                        <div class="line"><span class="n">7</span><span class="r rA">A</span><span class="refrain">refrain a again</span></div>
+                        <div class="line"><span class="n">8</span><span class="r rB">B</span><span class="refrain">refrain b again</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>Two nodes again, but small: <span class="node-ref n1">three fresh A-words</span>
+                    beyond your refrain and <span class="node-ref n2">one fresh B-word</span>. A good
+                    warm-up form for testing whether two rhyme nodes have chemistry before committing
+                    to a villanelle.</p>
+                </div>
+                <a class="try-link" href="workspace.html">test a pair of nodes →</a>
+            </section>
+
+            <section id="haiku">
+                <h2>Haiku</h2>
+                <div class="at-a-glance">3 lines · 5 / 7 / 5 syllables · no rhyme · one turn</div>
+                <p>No rhyme, no meter — just seventeen syllables and a cut. The classical haiku
+                sets an image, extends it, then pivots (the <em>kireji</em>, or cutting word)
+                to a second image that reframes the first. Concreteness beats abstraction;
+                seasons beat sentiments.</p>
+                <div class="scheme">
+                    <div class="stanza"><div class="stanza-label">The three</div>
+                        <div class="line"><span class="n">1</span><span class="r rX">×</span><span class="syl">5 syllables</span></div>
+                        <div class="line"><span class="n">2</span><span class="r rX">×</span><span class="syl">7 syllables</span></div>
+                        <div class="line"><span class="n">3</span><span class="r rX">×</span><span class="syl">5 syllables</span></div>
+                    </div>
+                </div>
+                <div class="graph-tip">
+                    <div class="tip-label">In the graph</div>
+                    <p>This is the form <em>syllables as altitude</em> was born for. Ignore the rhyme
+                    hubs entirely — read the strata like a till: a 5-syllable line is one word from
+                    floor 2 + one from floor 3, or five singles from the ground floor. Budget, then spend.</p>
+                </div>
+                <a class="try-link" href="workspace.html?seed=frost,whisper,ember,stillness,moon">seed an autumn haiku →</a>
+            </section>
+        </div>
+    </div>
+</body>
+</html>

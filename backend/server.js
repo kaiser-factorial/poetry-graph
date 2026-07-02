@@ -39,7 +39,7 @@ app.post('/api/graph', (req, res) => {
 });
 
 function buildPoetryGraph(words) {
-  const uniqueWords = [...new Set(words.map(w => w.toLowerCase()))].slice(0, 30);
+  const uniqueWords = [...new Set(words.map(w => w.toLowerCase()))].slice(0, 60);
 
   const graph = new ForceDirectedGraph(uniqueWords, {
     width: 800,

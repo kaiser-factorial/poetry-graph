@@ -5,7 +5,7 @@
 
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1?external=three';
 import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
-import { forceX, forceY, forceZ, forceCollide } from 'https://esm.sh/d3-force-3d@3';
+import { forceY, forceCollide } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
 const API_URL = 'http://localhost:3001';
@@ -88,6 +88,7 @@ let state = {
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
   forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
   syllableAltitude: false, // words stratify vertically by syllable count
+  draft: '', // the poem-in-progress, written in the Draft drawer
 };
 
 let selectedGroupKey = null;
@@ -105,6 +106,7 @@ function loadState() {
         state.words = parsed.words;
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
+        state.draft = parsed.draft || '';
       }
     }
   } catch (e) { /* fresh start */ }
@@ -193,11 +195,10 @@ function buildGraphData() {
     }
   }
 
-  // The lone "+" node
-  const plusInit = { type: 'plus', empty: state.words.length === 0 };
-  const plus = nodeCache.get('plus');
-  if (plus && plus.empty !== plusInit.empty) delete plus.__threeObj;
-  nodes.push(cachedNode('plus', plusInit));
+  // The "+" compass only greets an empty canvas; adding lives in the header
+  if (state.words.length === 0) {
+    nodes.push(cachedNode('plus', { type: 'plus', empty: true }));
+  }
 
   return { nodes, links };
 }
@@ -237,11 +238,30 @@ Graph.d3Force('link')
 Graph.d3Force('center').strength(0.14);
 Graph.d3Force('collide', forceCollide().radius(n => n.type === 'hub' ? 24 : 11));
 
-// The + node has no links, so raw repulsion would fling it away from the
-// poem — tether it gently near the poem's upper reaches instead.
-Graph.d3Force('plusX', forceX(0).strength(n => n.type === 'plus' ? 0.05 : 0));
-Graph.d3Force('plusZ', forceZ(0).strength(n => n.type === 'plus' ? 0.05 : 0));
-Graph.d3Force('plusY', forceY(70).strength(n => n.type === 'plus' ? 0.05 : 0));
+// Invisible spherical boundary: repulsion can spread the poem, but nothing
+// escapes the sphere. Radius grows gently with the word count.
+function boundaryRadius() {
+  return 110 + Math.min(state.words.length * 5, 180);
+}
+
+function boundaryForce() {
+  let nodes = [];
+  const force = alpha => {
+    const R = boundaryRadius();
+    for (const n of nodes) {
+      const d = Math.hypot(n.x || 0, n.y || 0, n.z || 0) || 1;
+      if (d > R) {
+        const k = ((d - R) / d) * alpha * 0.5;
+        n.vx -= n.x * k;
+        n.vy -= n.y * k;
+        n.vz -= n.z * k;
+      }
+    }
+  };
+  force.initialize = ns => { nodes = ns; };
+  return force;
+}
+Graph.d3Force('boundary', boundaryForce());
 
 function scaledCharge() {
   return -(15 + Math.min(state.words.length * 4, 65));
@@ -261,12 +281,16 @@ scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
 
 // ===== Syllable altitude =====
 // Words float at a height set by their syllable count; guide rings mark strata.
-const STRATUM_SPACING = 50;
 const strataGroup = new THREE.Group();
 scene.add(strataGroup);
 
+// Strata breathe with the poem: more words → taller floors and wider rings
+function stratumSpacing() {
+  return 40 + Math.min(state.words.length * 2.5, 60);
+}
+
 function stratumY(syllables) {
-  return ((syllables || 1) - 2) * STRATUM_SPACING;
+  return ((syllables || 1) - 2) * stratumSpacing();
 }
 
 function applyAltitudeForce() {
@@ -283,9 +307,10 @@ function updateStrataGuides() {
   strataGroup.clear();
   if (!state.syllableAltitude || !state.words.length) return;
 
-  // Ring radius adapts to the words' actual horizontal spread
+  // Ring radius adapts to the words' actual horizontal spread and grows
+  // with the poem
   const placed = Graph.graphData().nodes.filter(n => n.type === 'word' && n.x !== undefined);
-  const radius = Math.min(400, Math.max(80,
+  const radius = Math.min(420, Math.max(70 + state.words.length * 4,
     ...placed.map(n => Math.hypot(n.x || 0, n.z || 0) + 30)));
 
   const counts = [...new Set(state.words.map(w => w.syllables || 1))].sort((a, b) => a - b);
@@ -426,6 +451,7 @@ function makeNodeObject(node) {
 
 function refreshGraph() {
   Graph.d3Force('charge').strength(scaledCharge());
+  if (state.syllableAltitude) applyAltitudeForce(); // spacing scales with word count
   // graphData() reheats the simulation itself when the data changes
   Graph.graphData(buildGraphData());
   updateStrataGuides();
@@ -450,6 +476,24 @@ async function fetchWordInfo(text) {
   }
 }
 
+// True-rhyme grouping: spelling endings differ ("tone" / "known"), so a word
+// joins an existing group whenever it genuinely rhymes with a member —
+// checked against the new word's rhyme list and each group's cached one.
+function findRhymeGroup(clean, info) {
+  const rhymeSet = new Set(info.rhymes || []);
+  const groups = new Map();
+  for (const w of state.words) {
+    if (!groups.has(w.rhymeKey)) groups.set(w.rhymeKey, []);
+    groups.get(w.rhymeKey).push(w.text);
+  }
+  for (const [key, members] of groups) {
+    if (members.some(m => rhymeSet.has(m))) return key;
+    const cached = suggestionCache.get(`rhyme:${key}`);
+    if (cached && cached.includes(clean)) return key;
+  }
+  return null;
+}
+
 async function addWord(text, { rhymeKey = null, onsetKey = null } = {}) {
   const clean = normalizeWord(text);
   if (!clean) return null;
@@ -459,7 +503,7 @@ async function addWord(text, { rhymeKey = null, onsetKey = null } = {}) {
   const info = await fetchWordInfo(clean);
   const word = {
     text: clean,
-    rhymeKey: rhymeKey || info.ending,
+    rhymeKey: rhymeKey || findRhymeGroup(clean, info) || info.ending,
     onsetKey: onsetKey || info.onset,
     pos: info.pos || [],
     syllables: info.syllables || localSyllables(clean),
@@ -542,24 +586,36 @@ function openAddPanel() {
   panelMode = 'add';
   selectedGroupKey = null;
   panel.style.display = 'flex';
-  panelTitle.textContent = 'Add a word';
+  panelTitle.textContent = 'Add words';
   panelBody.innerHTML = `
     <div class="add-input">
-      <input type="text" id="wordInput" placeholder="type a word, e.g. lost" autocomplete="off">
+      <input type="text" id="wordInput" placeholder="a word, or several…" autocomplete="off">
       <button id="wordAddBtn">Add</button>
     </div>
     <p class="muted" style="margin-top: 10px;">
-      The word joins its ${state.mode === 'rhyme' ? 'rhyme family (like "-ost")' : 'starting-sound group (like "L-")'} —
-      or starts a new one.
-    </p>`;
+      Enter keeps the field open, so you can pour in a handful.
+      Separate several with spaces or commas.
+    </p>
+    <div id="addLog" class="chip-list" style="margin-top: 12px;"></div>`;
 
   const input = document.querySelector('#wordInput');
+  const log = document.querySelector('#addLog');
   const submit = async () => {
-    const value = input.value.trim();
-    if (!value) return;
+    const values = input.value.split(/[\s,]+/).filter(Boolean);
+    if (!values.length) return;
     input.value = '';
-    const word = await addWord(value);
-    if (word) openGroupPanel(activeKeyOf(word));
+    for (const value of values) {
+      const word = await addWord(value);
+      if (word && panelMode === 'add') {
+        const chip = document.createElement('span');
+        chip.className = 'chip member';
+        chip.innerHTML = `${word.text} <span class="meta">→ ${state.mode === 'rhyme' ? '-' + word.rhymeKey : word.onsetKey.toUpperCase() + '-'}</span>`;
+        chip.title = 'view group';
+        chip.addEventListener('click', () => openGroupPanel(activeKeyOf(word)));
+        log.prepend(chip);
+      }
+    }
+    if (panelMode === 'add') input.focus();
   };
   document.querySelector('#wordAddBtn').addEventListener('click', submit);
   input.addEventListener('keypress', e => { if (e.key === 'Enter') submit(); });
@@ -586,11 +642,13 @@ async function openGroupPanel(groupKey) {
     <h3>In this poem</h3>
     <div class="chip-list">${members.map(memberChip).join('') || '<span class="muted">none yet</span>'}</div>
     <h3>${state.mode === 'rhyme' ? 'Rhymes' : 'Same starting sound'} — click to add</h3>
-    <div class="chip-list" id="suggestionList"><span class="muted">loading…</span></div>`;
+    <div class="chip-list" id="suggestionList"><span class="muted">loading…</span></div>
+    <button id="addAnotherBtn" style="margin-top: 16px; background: transparent; border: 1px solid var(--hairline-strong); color: var(--bone); padding: 7px 14px; cursor: pointer; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; width: 100%;">＋ add another word</button>`;
 
   panelBody.querySelectorAll('.chip.member').forEach(chip => {
     chip.addEventListener('click', () => removeWord(chip.dataset.word));
   });
+  panelBody.querySelector('#addAnotherBtn').addEventListener('click', openAddPanel);
 
   const suggestions = await getSuggestions(groupKey, members);
   if (panelMode !== 'group' || selectedGroupKey !== groupKey) return;
@@ -660,8 +718,54 @@ function renderForcesPanel() {
   });
 }
 
+// ===== Draft drawer =====
+// A place to actually write — with a live syllable count per line.
+// Words already in the graph use their true (Datamuse) counts; everything
+// else falls back to the local heuristic.
+const draftEl = document.querySelector('#draft');
+const draftText = document.querySelector('#draftText');
+const draftGutter = document.querySelector('#draftGutter');
+
+function lineSyllables(line) {
+  const tokens = line.toLowerCase().match(/[a-z']+/g) || [];
+  if (!tokens.length) return '';
+  const known = new Map(state.words.map(w => [w.text, w.syllables]));
+  return tokens.reduce((sum, t) => {
+    const clean = t.replace(/'/g, '');
+    return sum + (known.get(clean) ?? localSyllables(clean));
+  }, 0);
+}
+
+function updateDraftGutter() {
+  draftGutter.innerHTML = draftText.value.split('\n')
+    .map(line => `<div>${lineSyllables(line)}</div>`)
+    .join('');
+  draftGutter.scrollTop = draftText.scrollTop;
+}
+
+draftText.addEventListener('input', () => {
+  state.draft = draftText.value;
+  saveState();
+  updateDraftGutter();
+});
+draftText.addEventListener('scroll', () => { draftGutter.scrollTop = draftText.scrollTop; });
+
+document.querySelector('#draftBtn').addEventListener('click', () => {
+  const open = draftEl.style.display !== 'none';
+  draftEl.style.display = open ? 'none' : 'flex';
+  if (!open) {
+    draftText.value = state.draft || '';
+    updateDraftGutter();
+    draftText.focus();
+  }
+});
+document.querySelector('#draftClose').addEventListener('click', () => {
+  draftEl.style.display = 'none';
+});
+
 // ===== Toolbar =====
 document.querySelector('#panelClose').addEventListener('click', closePanel);
+document.querySelector('#addWordBtn').addEventListener('click', openAddPanel);
 
 document.querySelectorAll('#modeToggle button').forEach(btn => {
   btn.addEventListener('click', () => {

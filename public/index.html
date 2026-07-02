@@ -94,11 +94,11 @@
 
         .node-label {
             pointer-events: none;
-            font-size: 12px;
-            font-weight: bold;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 16px;
+            font-weight: 600;
             text-anchor: middle;
-            dy: '0.3em';
-            fill: white;
+            fill: #e8e2d3;
         }
 
         .sidebar {
@@ -252,6 +252,7 @@
         <h1>Poetry Graph</h1>
         <p class="subtitle" style="color: #8f897c; font-style: italic;">map semantic and phonetic relationships between words</p>
         <a href="workspace.html" style="display: inline-block; margin-top: 12px; color: #e8e2d3; text-decoration: none; padding: 7px 18px; border: 1px solid rgba(232,226,211,0.3); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.14em;">Start a New Poem</a>
+        <a href="forms.html" style="display: inline-block; margin-top: 12px; margin-left: 8px; color: #8f897c; text-decoration: none; padding: 7px 18px; border: 1px solid rgba(232,226,211,0.14); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.14em;">Poetic Forms</a>
     </header>
 
     <main>
@@ -262,9 +263,11 @@
         <div class="sidebar">
             <div class="sidebar-content">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search or add words...">
-                    <small style="color: #8f897c; display: block; margin-top: 5px;">Separate words with commas or spaces</small>
+                    <input type="text" id="searchInput" placeholder="Add words to the canvas...">
+                    <small style="color: #8f897c; display: block; margin-top: 5px;">Separate words with commas or spaces — they join the graph</small>
                 </div>
+
+                <button class="button" id="toWorkspaceBtn" style="margin-top: 0; margin-bottom: 20px;">Open these words in the Workspace →</button>
 
                 <div class="word-section" id="statsSection" style="background: #1c1b23; padding: 12px; border-radius: 5px; margin-bottom: 15px;">
                     <h3 style="font-size: 0.9em; margin-bottom: 8px;">Graph Stats</h3>
