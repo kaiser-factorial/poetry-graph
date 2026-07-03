@@ -1,228 +1,65 @@
-# 🌙 Poetry Graph
+# Poetry Graph
 
-An interactive force-directed graph that maps semantic and phonetic relationships between words, enabling exploration and generation of poetry through visual word clustering.
+An instrument for seeing, building, and performing the sound-structure of poems — a 3D force-directed word-graph in the style of an etched star atlas.
 
-## Overview
+Words enter as points; their relationships become forces. Rhyme families gather into engraved orbit-circles, alliterations thread between them, meanings pull, syllables stratify, and — if you're feeling occult — every word's Alphanumeric Qabbala value assigns it a zone on the CCRU numogram. You can gather a palette for a poem you haven't written, drape a villanelle template over it, scan your meter as you draft, X-ray a poem that already exists, engrave the result as a plate, mail it as a URL, or press **Perform** and let the poem fly the camera and ring its zones as pentatonic tones.
 
-Poetry Graph combines three key concepts:
-
-1. **Semantic Embeddings**: Words with similar meanings cluster together
-2. **Phonetic Compatibility**: Words that rhyme create attractive forces
-3. **Force-Directed Layout**: Physics simulation creates an intuitive, explorable space
-
-The result is an interactive visualization where clicking on any word reveals its rhyming partners and semantically similar words, inspiring creative combinations and new perspectives on word relationships.
-
-## ✨ Poem Workspace (3D)
-
-The centerpiece: [workspace.html](public/workspace.html) is a WebGL force-directed space for drafting a poem's sound-palette.
-
-- Start from a lone **+** sphere; each word you add joins its **rhyme family** hub (`-ost`, `-ame`, …) or starts a new one
-- Click a hub to expand it: members plus real rhyme suggestions (Datamuse, frequency-filtered) you can add with one click
-- Toggle to **alliteration** and the same words physically reorganize under starting-sound hubs (`C-`, `WH-`, …)
-- Four connection layers — rhyme, alliteration, part of speech, syllable count — each with a **force slider** controlling how strongly it pulls words together
-- Orbit, zoom, and drag glossy spheres in a starfield with depth fog; poems persist locally and are shareable via `?seed=lost,name,cost`
-
-## Features
-
-- 🎨 **Interactive Force-Directed Graph**: Drag, pan, and zoom to explore word relationships
-- 🎵 **Rhyme Finder**: Click any word to discover its rhyming companions
-- 📚 **Semantic Search**: Find words with similar meanings and connotations
-- ✍️ **Poem Generation**: Generate poetry in multiple styles using graph relationships:
-  - Short verses
-  - Rhyming couplets
-  - Multi-line stanzas
-  - Full narrative poems
-- 🔍 **Custom Word Lists**: Add your own words to build personalized poetry spaces
-- 🌈 **Visual Clustering**: See how concepts naturally group together
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 14+
-- npm
-
-### Installation
+## Running it
 
 ```bash
-# Install dependencies
-npm install
-cd backend && npm install
+# terminal 1 — API (rhymes, phonetics, semantics, stress)
+cd backend && npm install && npm start        # http://localhost:3001
 
-# The frontend uses D3 via CDN, no additional installation needed
+# terminal 2 — frontend (static, cache disabled)
+npx http-server public -p 3000 -c-1           # http://localhost:3000
 ```
 
-### Running the Application
+Then open [http://localhost:3000/workspace.html](http://localhost:3000/workspace.html). An internet connection makes everything richer (Datamuse supplies rhymes, meanings, and parts of speech); offline, spelling-based fallbacks take over.
 
-1. **Start the backend API** (Terminal 1):
-```bash
-cd backend
-npm start
-# API will run on http://localhost:3001
-```
+## The pages
 
-2. **Start the frontend server** (Terminal 2):
-```bash
-npx http-server public -p 3000
-# Frontend will be available at http://localhost:3000
-```
+### ✍️ Workspace (`workspace.html`) — the centerpiece
+A WebGL scene (three.js via `3d-force-graph`) where your poem's words live.
 
-3. **Open your browser**:
-Navigate to [http://localhost:3000](http://localhost:3000)
+- **Three groupings**: **Rhyme** (true sound-families — *tone, known, throne, moan* share one node despite four spellings), **Alliteration** (onset families, digraph-aware), and **Numogram** (words fall to zones 0–9 by the digital root of their AQ value, pinned to the canonical diagram or to a Barker-spiral helix).
+- **Connection force sliders**: rhyme, alliteration, part of speech, syllables, gematria, semantic **meaning** (Datamuse means-like), **your bonds** (shift-click two words to bind them by hand), and **poem flow** (the draft's word order as directed particle-edges). Each slider sets how strongly that relationship pulls the layout.
+- **Literal alliteration** toggle: onset links only where words actually follow one another in the draft — the device, not the coincidence.
+- **Syllables as altitude**: words stratify onto labeled floors by syllable count.
+- **Draft drawer**: write beside the map with live per-line syllable counts, line AQ values with plex reductions, and a **scansion mode** (˘´) showing true CMU stress marks — clean lines get their meter named.
+- **Form templates**: begin a villanelle, sestina, sonnet, ballad, limerick, triolet, or haiku from the Forms page and the drawer becomes a stanza-sectioned template with color-coded end-word boxes. Refrains propagate themselves; the sestina spiral fills automatically; click a graph word to fill the armed slot.
+- **Perform**: ritual playback — camera flight along the poem's order, words flaring in sequence, each sounding its zone as a pentatonic pitch over a drone.
+- **Export**: engrave the current view as a framed, captioned PNG plate, or fold the entire poem-state into a shareable URL.
+- Panels drag, collapse, and resize; camera can be axis-locked (turntable / tilt / face).
 
-## API Endpoints
+### 📖 Read (`read.html`)
+Paste an existing poem and see what it sounds like: function words are skipped, true rhyme families detected, loners (no rhyme or alliteration partner) cut and listed, then the survivors open in the workspace — line-ending words in brass, the original text pre-loaded in the drawer, flow and literal alliteration on. Try the Frost sample: it recovers his entire rhyme scheme from raw text.
 
-### Graph Operations
+### 📜 Forms (`forms.html`)
+A field guide to the fixed forms — rhyme schemes drawn with colored node letters, refrains and syllable targets annotated, the sestina's full spiral table — each with a recipe for gathering its materials from the graph and a one-click "begin" that opens its template.
 
-- `GET /api/graph` - Get default word graph
-- `POST /api/graph` - Build graph from custom words
-  ```json
-  {
-    "words": ["love", "heart", "fire", "passion"]
-  }
-  ```
+### 🔭 Explorer (`index.html`)
+The original 2D prototype: a light staging canvas for collecting words before opening them in the workspace.
 
-### Word Relationships
+## How the sound-analysis works
 
-- `GET /api/rhymes?word=love` - Find rhyming words
-- `GET /api/similar?word=love` - Find semantically similar words
-- `GET /api/words` - Get all available words
+- **Rhyme**: [Datamuse](https://www.datamuse.com/api/) `rel_rhy`, frequency-filtered; a new word joins an existing family whenever it truly rhymes with a member, so spelling never splits a sound.
+- **Onsets**: first letter/sound with digraph (`wh-`, `th-`…) and silent-start (`kn-` → n) handling.
+- **Meaning**: Datamuse `ml=` semantic neighbors, stored per word; pairwise links.
+- **Stress & syllables**: the [CMU Pronouncing Dictionary](https://github.com/words/cmu-pronouncing-dictionary) (135k words) for true stress patterns.
+- **Gematria**: Alphanumeric Qabbala — base-36, digits keep face value, A–Z map to 10–35, summed; zone = digital root.
 
-### Poetry Generation
+## Credits
 
-- `POST /api/poem` - Generate poem
-  ```json
-  {
-    "words": ["love", "heart", "fire"],
-    "style": "verse" // or "couplets", "stanza", "long"
-  }
-  ```
+- **[lumpenspace/ccru](https://github.com/lumpenspace/ccru)** and **[qliphoth.systems](https://qliphoth.systems)** — the numogram implementation this project's gematria mode is built on: the AQ cipher behavior, the canonical zone geometry (`original` layout coordinates), zone colors, regions, phonic particles, syzygies, currents, gates, and zone lore all follow that repository's data. The CypherHover component inspired the plex-reduction displays. Deep gratitude — go explore the interactive numogram at [num.qliphoth.systems](https://num.qliphoth.systems).
+- The **CCRU** (Cybernetic Culture Research Unit), whose writings the numogram, zones, syzygies, currents, gates, and demons originate from.
+- **[Datamuse API](https://www.datamuse.com/api/)** — rhymes, semantic neighbors, parts of speech, frequencies.
+- **[CMU Pronouncing Dictionary](https://github.com/words/cmu-pronouncing-dictionary)** — stress patterns and syllable counts.
+- **[3d-force-graph](https://github.com/vasturiano/3d-force-graph)**, **[three-spritetext](https://github.com/vasturiano/three-spritetext)**, and **[d3-force-3d](https://github.com/vasturiano/d3-force-3d)** by Vasco Asturiano; **[three.js](https://threejs.org)**; **[D3](https://d3js.org)**.
+- Typefaces: **Cormorant Garamond** and **Inter** (Google Fonts).
+- The Read page's sample is Robert Frost's *Nothing Gold Can Stay* (1923, public domain).
 
-- `GET /api/poem/:theme` - Generate poem with theme
-  ```
-  GET /api/poem/love
-  ```
+## For future development
 
-## Architecture
+See [HANDOFF.md](HANDOFF.md) — architecture notes, loose threads, and the long brainstorm.
 
-### Backend (`/backend`)
-
-- **server.js**: Express API server
-- **embeddings.js**: Word embedding system with semantic similarity
-- **rhyme.js**: Phonetic matching and rhyme detection
-- **forceLayout.js**: Force-directed graph layout engine
-- **poemGenerator.js**: Poetry generation using word relationships
-
-### Frontend (`/public`)
-
-- **index.html**: UI layout and styling
-- **app.js**: D3 visualization and interaction logic
-
-## How It Works
-
-### 1. Word Embeddings
-Each word is represented as a 4-dimensional vector capturing semantic meaning:
-```javascript
-'love': [0.9, 0.8, 0.7, 0.6],
-'heart': [0.85, 0.7, 0.65, 0.5],
-// Similar vectors = similar meanings
-```
-
-### 2. Rhyme Detection
-Words are matched by phonetic endings:
-```javascript
-'light', 'night', 'bright', 'might', 'sight' // All rhyme
-'love', 'dove', 'above', 'thereof' // All rhyme
-```
-
-### 3. Force-Directed Layout
-The graph positions words using forces:
-- **Coulomb Repulsion**: All words push apart (-300 charge)
-- **Spring Forces**: Related words (rhyming or similar) pull together
-- **Damping**: Smooth motion with friction
-
-### 4. Poetry Generation
-The generator uses word relationships to create coherent verse:
-```
-In love's embrace, heart blooms,
-Where beautiful meets the silent night.
-Light dances through forgotten dreams,
-A whisper of hope in the soul.
-```
-
-## Customization
-
-### Add Custom Words
-
-In the sidebar, type words separated by commas or spaces:
-```
-fire, passion, wine, divine
-```
-
-Press Enter to rebuild the graph with your words.
-
-### Adjust Graph Parameters
-
-Edit `/backend/server.js`:
-```javascript
-const graph = new ForceDirectedGraph(uniqueWords, {
-  charge: -500,        // Repulsion strength
-  linkDistance: 120,    // Spring rest length
-  iterations: 100,      // Simulation steps
-});
-```
-
-### Extend Embeddings
-
-Add more words to `/backend/embeddings.js`:
-```javascript
-const embeddings = {
-  'mystique': [0.7, 0.8, 0.9, 0.6],
-  'whisper': [0.6, 0.5, 0.8, 0.7],
-  // ... more words
-};
-```
-
-## Example Poems
-
-See [POEMS.md](POEMS.md) for poetry generated by the graph.
-
-## Technical Stack
-
-- **Frontend**: D3.js 7 for visualization
-- **Backend**: Express.js for API
-- **Layout**: Custom force-directed simulation
-- **Embeddings**: Custom 4D vectors (can be extended to use pre-trained models)
-- **Rhyming**: Phonetic pattern matching
-
-## Future Enhancements
-
-- [ ] Integration with word2vec or GloVe embeddings for better semantics
-- [ ] Advanced phonetic matching (IPA-based rhyming)
-- [ ] Persistent user-created word graphs
-- [ ] Social sharing of generated poems
-- [ ] Music integration (converting poems to melody)
-- [ ] Multi-language support
-- [ ] Real-time collaboration
-
-## Contributing
-
-Ideas and pull requests welcome! Some areas for contribution:
-
-- Improved embedding models
-- More sophisticated rhyme detection
-- Better poem generation templates
-- Frontend UI enhancements
-- Performance optimization
-
-## License
-
-MIT
-
-## Author
-
-Created with creativity and mathematics as an exploration of how language can be visualized, played with, and transformed through computation.
-
----
-
-**Try it out!** Open [http://localhost:3000](http://localhost:3000) and start exploring the space between meaning and sound. 🎨✨
+Earlier iterations are documented in [docs/archive](docs/archive).
