@@ -54,6 +54,73 @@ function localSyllables(word) {
 // Each type can group (hubs) and/or cross-link, with a force weight slider.
 const POS_NAMES = { n: 'noun', v: 'verb', adj: 'adjective', adv: 'adverb' };
 
+// ===== Gematria / Numogram =====
+// Alphanumeric Qabbala (AQ): base-36 — digits keep face value, a–z map to
+// 10–35; a word's value is the sum. Its zone is the digital root (plex).
+// Structure and geometry follow the CCRU numogram (via qliphoth.systems).
+
+function aqValue(text) {
+  let sum = 0;
+  for (const ch of String(text).toLowerCase()) {
+    const code = ch.charCodeAt(0);
+    if (code >= 48 && code <= 57) sum += code - 48;
+    else if (code >= 97 && code <= 122) sum += code - 97 + 10;
+  }
+  return sum;
+}
+
+function digitalRoot(n) {
+  while (n >= 10) n = String(n).split('').reduce((a, d) => a + Number(d), 0);
+  return n;
+}
+
+function plexSteps(n) {
+  let expr = `${n}`;
+  while (n >= 10) {
+    const digits = String(n).split('');
+    n = digits.reduce((a, d) => a + Number(d), 0);
+    expr += ` = ${digits.join('+')} = ${n}`;
+  }
+  return expr;
+}
+
+function zoneOf(text) {
+  return String(digitalRoot(aqValue(text)));
+}
+
+// Canonical numogram geometry ("original" layout), zone colors, and lore
+const ZONE_POS = {
+  6: [250, 85], 3: [420, 115], 2: [560, 275], 7: [580, 400], 5: [250, 370],
+  4: [178, 480], 1: [400, 550], 8: [400, 660], 9: [400, 770], 0: [400, 875],
+};
+const NUMO_CENTER = [400, 460];
+const ZONE_CLR = {
+  0: '#aaaaaa', 1: '#ee44ee', 2: '#4488ff', 3: '#44cc77', 4: '#ee4444',
+  5: '#ee8833', 6: '#ddcc33', 7: '#7755cc', 8: '#9944ee', 9: '#666666',
+};
+const PLANET_SYMBOL = {
+  0: '☉', 1: '☿', 2: '♀', 3: '♁', 4: '♂',
+  5: '♃', 6: '♄', 7: '♅', 8: '♆', 9: '♇',
+};
+const SYZYGY_PAIRS = [
+  [4, 5, 'Katak'], [3, 6, 'Djynxx'], [2, 7, 'Oddubb'], [1, 8, 'Murrumur'], [0, 9, 'Uttunul'],
+];
+const NUMO_CURRENTS = [
+  ['Surge', 8, 7], ['Hold', 2, 5], ['Sink', 4, 1], ['Warp', 6, 3],
+];
+const ZONE_LORE = {
+  0: { planet: 'Sol', region: 'plex', particle: 'eiaoung', line: 'Dense void of the cosmic hypermatrix — flatline and loss of signal.' },
+  1: { planet: 'Mercury', region: 'torque', particle: 'gl', line: 'Meta-static pod-deliria and techno-immortalism; the Door of Doors.' },
+  2: { planet: 'Venus', region: 'torque', particle: 'dt', line: 'Crypt-navigation, occulted cyberspace — greys, ghosts and zombies.' },
+  3: { planet: 'Earth', region: 'warp', particle: 'zx', line: 'Swirling nebulae and alien pattern; vortical involvement with Zone-6.' },
+  4: { planet: 'Mars', region: 'torque', particle: 'skr', line: 'Delta-phase terminal deliria — end-of-the-river disintegration.' },
+  5: { planet: 'Jupiter', region: 'torque', particle: 'ktt', line: 'Hyperborean mythology, missing time; inner-eye of the Barker spiral.' },
+  6: { planet: 'Saturn', region: 'warp', particle: 'tch', line: 'Occulted dimensions of Undu; the dead eye of the cyclone.' },
+  7: { planet: 'Uranus', region: 'torque', particle: 'pb', line: 'Emergence from the depths — hyper-sea carriers, swamp-labyrinths.' },
+  8: { planet: 'Neptune', region: 'torque', particle: 'mnm', line: 'Limbic drift, dreams, trance-states and foetal sentience.' },
+  9: { planet: 'Pluto', region: 'plex', particle: 'tn', line: 'Cthelloid metallic ocean of the core — the outermost reaches the innermost.' },
+};
+
 // Muted atlas palette: brass, slate, sage, mauve
 const CONNECTION_TYPES = {
   rhyme: {
@@ -76,6 +143,11 @@ const CONNECTION_TYPES = {
     color: '#8f7a92',
     keyOf: w => (w.syllables > 0 ? String(w.syllables) : null),
   },
+  gematria: {
+    label: 'Gematria',
+    color: '#b0705c',
+    keyOf: w => zoneOf(w.text),
+  },
 };
 
 const BONE = '#e8e2d3';
@@ -86,7 +158,7 @@ const SERIF = '"Cormorant Garamond", serif';
 let state = {
   mode: 'rhyme', // grouping: 'rhyme' | 'alliteration'
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
-  forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
+  forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, flow: 0 },
   syllableAltitude: false, // words stratify vertically by syllable count
   draft: '', // the poem-in-progress, written in the Draft drawer
   form: null, // active poetic-form template (key into FORMS)
@@ -105,7 +177,7 @@ function loadState() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.words)) {
-        state.mode = parsed.mode === 'alliteration' ? 'alliteration' : 'rhyme';
+        state.mode = ['alliteration', 'gematria'].includes(parsed.mode) ? parsed.mode : 'rhyme';
         state.words = parsed.words;
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
@@ -127,7 +199,9 @@ function activeKeyOf(word) {
 }
 
 function hubLabel(key) {
-  return state.mode === 'rhyme' ? `-${key}` : `${key.toUpperCase()}-`;
+  if (state.mode === 'rhyme') return `-${key}`;
+  if (state.mode === 'gematria') return `${key} ${PLANET_SYMBOL[key] || ''}`;
+  return `${key.toUpperCase()}-`;
 }
 
 // ===== Graph data =====
@@ -152,6 +226,38 @@ function buildGraphData() {
     const key = activeKeyOf(word);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(word);
+  }
+
+  // Numogram mode: all ten zones render as pinned anchors in the canonical
+  // geometry — the poem populates the diagram rather than shaping it.
+  if (state.mode === 'gematria') {
+    const scale = 0.55 + Math.min(state.words.length * 0.015, 0.35);
+    for (let z = 0; z <= 9; z++) {
+      const key = String(z);
+      const id = `hub:gematria:${key}`;
+      const memberCount = (groups.get(key) || []).length;
+      let node = nodeCache.get(id);
+      if (node && (node.memberCount !== memberCount)) delete node.__threeObj;
+      node = cachedNode(id, { type: 'hub', key, label: hubLabel(key), zone: z, memberCount });
+      node.fx = (ZONE_POS[z][0] - NUMO_CENTER[0]) * scale;
+      node.fy = -(ZONE_POS[z][1] - NUMO_CENTER[1]) * scale;
+      node.fz = 0;
+      if (node.x === undefined) { node.x = node.fx; node.y = node.fy; node.z = 0; }
+      nodes.push(node);
+    }
+    for (const word of state.words) {
+      nodes.push(cachedNode(`w:${word.text}`, { type: 'word', word }));
+      links.push({ source: `w:${word.text}`, target: `hub:gematria:${activeKeyOf(word)}`, kind: 'member' });
+    }
+    for (const [a, b] of SYZYGY_PAIRS) {
+      links.push({ source: `hub:gematria:${a}`, target: `hub:gematria:${b}`, kind: 'syzygy' });
+    }
+    for (const [, from, to] of NUMO_CURRENTS) {
+      links.push({ source: `hub:gematria:${from}`, target: `hub:gematria:${to}`, kind: 'current' });
+    }
+    addCrossLinks(links);
+    addFlowLinks(links);
+    return { nodes, links };
   }
 
   // In small poems every group gets its circle (watching "-ost" appear as
@@ -189,7 +295,19 @@ function buildGraphData() {
     }
   }
 
-  // Cross-links for every non-grouping connection type with weight > 0
+  addCrossLinks(links);
+  addFlowLinks(links);
+
+  // The "+" compass only greets an empty canvas; adding lives in the header
+  if (state.words.length === 0) {
+    nodes.push(cachedNode('plus', { type: 'plus', empty: true }));
+  }
+
+  return { nodes, links };
+}
+
+// Cross-links for every non-grouping connection type with weight > 0
+function addCrossLinks(links) {
   for (const [typeName, type] of Object.entries(CONNECTION_TYPES)) {
     if (typeName === state.mode) continue;
     if (typeName === 'syllables' && state.syllableAltitude) continue; // shown as altitude instead
@@ -209,13 +327,33 @@ function buildGraphData() {
       }
     }
   }
+}
 
-  // The "+" compass only greets an empty canvas; adding lives in the header
-  if (state.words.length === 0) {
-    nodes.push(cachedNode('plus', { type: 'plus', empty: true }));
+// Poem-order flow: consecutive words of the draft, traced as directed edges
+function flowPairs() {
+  if (!(state.forceWeights.flow > 0) || !state.draft) return [];
+  const have = new Set(state.words.map(w => w.text));
+  const seq = [];
+  for (const tok of (state.draft.toLowerCase().match(/[a-z']+/g) || [])) {
+    const clean = tok.replace(/'/g, '');
+    if (have.has(clean)) seq.push(clean);
   }
+  const seen = new Set();
+  const pairs = [];
+  for (let i = 0; i < seq.length - 1; i++) {
+    if (seq[i] === seq[i + 1]) continue;
+    const k = `${seq[i]}→${seq[i + 1]}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    pairs.push([seq[i], seq[i + 1]]);
+  }
+  return pairs;
+}
 
-  return { nodes, links };
+function addFlowLinks(links) {
+  for (const [a, b] of flowPairs()) {
+    links.push({ source: `w:${a}`, target: `w:${b}`, kind: 'flow' });
+  }
 }
 
 // ===== 3D rendering =====
@@ -227,12 +365,24 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
   .backgroundColor(INK)
   .showNavInfo(false)
   .nodeThreeObject(node => makeNodeObject(node))
-  .linkColor(link => link.kind === 'member' ? 'rgba(232,226,211,0.6)' : CONNECTION_TYPES[link.kind].color)
+  .linkColor(link => {
+    if (link.kind === 'member') return 'rgba(232,226,211,0.6)';
+    if (link.kind === 'syzygy') return 'rgba(232,226,211,0.35)';
+    if (link.kind === 'current') return '#b0705c';
+    if (link.kind === 'flow') return '#d9be7c';
+    return CONNECTION_TYPES[link.kind].color;
+  })
   .linkOpacity(0.55)
   .linkWidth(link => {
     if (link.kind === 'member') return 0.4;
+    if (link.kind === 'syzygy') return 0.25;
+    if (link.kind === 'current') return 0.55;
+    if (link.kind === 'flow') return 0.5;
     return 0.3 + (state.forceWeights[link.kind] || 0) * 0.9;
   })
+  .linkDirectionalParticles(link => link.kind === 'flow' ? 3 : link.kind === 'current' ? 2 : 0)
+  .linkDirectionalParticleSpeed(link => link.kind === 'flow' ? 0.006 : 0.0035)
+  .linkDirectionalParticleWidth(1.7)
   .onNodeClick(node => {
     if (node.type === 'plus') { openAddPanel(); return; }
     // With a form template open, clicking a word fills the armed end-word box
@@ -273,9 +423,15 @@ function applyNodeHover(node, on) {
 // Charge (repulsion) is set per-refresh, scaled to the number of words —
 // small poems stay compact, bigger ones get room to breathe.
 Graph.d3Force('link')
-  .distance(link => link.kind === 'member' ? 24 : 50)
+  .distance(link => {
+    if (link.kind === 'member') return 24;
+    if (link.kind === 'flow') return 42;
+    return 50;
+  })
   .strength(link => {
     if (link.kind === 'member') return 0.9;
+    if (link.kind === 'syzygy' || link.kind === 'current') return 0; // decorative: both ends pinned
+    if (link.kind === 'flow') return 0.2 * (state.forceWeights.flow || 0);
     return 0.35 * (state.forceWeights[link.kind] || 0);
   });
 Graph.d3Force('center').strength(0.14);
@@ -392,16 +548,19 @@ function makeSprite(canvas, scale) {
   return sprite;
 }
 
-function hubSprite(label, r) {
+function hubSprite(label, r, zone = null, ghost = false) {
   const S = 512;
   const c = document.createElement('canvas');
   c.width = c.height = S;
   const ctx = c.getContext('2d');
   const cx = S / 2;
   const R = S / 2 - 28;
+  const alpha = ghost ? 0.35 : 1;
+  ctx.globalAlpha = alpha;
 
-  // engraved double circle
-  ctx.strokeStyle = 'rgba(238,232,218,1)';
+  // engraved double circle — zone hubs take their zone's tint
+  const stroke = zone !== null ? ZONE_CLR[zone] : 'rgba(238,232,218,1)';
+  ctx.strokeStyle = stroke;
   ctx.lineWidth = 6;
   ctx.beginPath(); ctx.arc(cx, cx, R, 0, Math.PI * 2); ctx.stroke();
   ctx.strokeStyle = 'rgba(232,226,211,0.3)';
@@ -419,11 +578,18 @@ function hubSprite(label, r) {
     ctx.stroke();
   }
 
-  ctx.font = `600 158px ${SERIF}`;
+  ctx.font = `600 ${zone !== null ? 138 : 158}px ${SERIF}`;
   ctx.fillStyle = 'rgba(238,232,218,1)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, cx, cx + 10);
+  ctx.fillText(label, cx, zone !== null ? cx - 12 : cx + 10);
+
+  if (zone !== null) {
+    // the zone's phonic particle, etched beneath
+    ctx.font = '400 52px "Inter", sans-serif';
+    ctx.fillStyle = 'rgba(232,226,211,0.6)';
+    ctx.fillText(ZONE_LORE[zone].particle, cx, cx + 96);
+  }
 
   return makeSprite(c, r * 2.9);
 }
@@ -461,7 +627,8 @@ function makeNodeObject(node) {
 
   if (node.type === 'hub') {
     const r = 12 + Math.min(node.memberCount * 1.4, 9);
-    group.add(hubSprite(node.label, r));
+    const zone = node.zone !== undefined ? node.zone : null;
+    group.add(hubSprite(node.label, r, zone, zone !== null && node.memberCount === 0));
     return group;
   }
 
@@ -653,7 +820,10 @@ function openAddPanel() {
       if (word && panelMode === 'add') {
         const chip = document.createElement('span');
         chip.className = 'chip member';
-        chip.innerHTML = `${word.text} <span class="meta">→ ${state.mode === 'rhyme' ? '-' + word.rhymeKey : word.onsetKey.toUpperCase() + '-'}</span>`;
+        chip.innerHTML = `${word.text} <span class="meta">→ ${
+          state.mode === 'rhyme' ? '-' + word.rhymeKey
+          : state.mode === 'gematria' ? 'zone ' + zoneOf(word.text)
+          : word.onsetKey.toUpperCase() + '-'}</span>`;
         chip.title = 'view group';
         chip.addEventListener('click', () => openGroupPanel(activeKeyOf(word)));
         log.prepend(chip);
@@ -667,6 +837,10 @@ function openAddPanel() {
 }
 
 function memberChip(m) {
+  if (state.mode === 'gematria') {
+    const aq = aqValue(m.text);
+    return `<span class="chip member" data-word="${m.text}" title="AQ ${plexSteps(aq)}">${m.text}<span class="meta">${aq}</span><span class="x">✕</span></span>`;
+  }
   const posName = POS_NAMES[m.pos?.[0]] || '';
   const meta = [posName, m.syllables ? `${m.syllables} syl` : ''].filter(Boolean).join(' · ');
   return `<span class="chip member" data-word="${m.text}" title="${meta || 'click to remove'}">${m.text}<span class="meta">${m.syllables || ''}</span><span class="x">✕</span></span>`;
@@ -678,6 +852,31 @@ async function openGroupPanel(groupKey) {
   panel.style.display = 'flex';
 
   const members = state.words.filter(w => activeKeyOf(w) === groupKey);
+
+  if (state.mode === 'gematria') {
+    const z = parseInt(groupKey);
+    const lore = ZONE_LORE[z];
+    const [a, b, demon] = SYZYGY_PAIRS.find(([x, y]) => x === z || y === z);
+    const twin = a === z ? b : a;
+    const current = NUMO_CURRENTS.find(([, f, t]) => f === z || t === z);
+    panelTitle.textContent = `Zone ${z} — ${lore.planet}`;
+    panelBody.innerHTML = `
+      <h3>In this poem — words plexing to ${z}</h3>
+      <div class="chip-list">${members.map(memberChip).join('') || '<span class="muted">no words have settled here yet</span>'}</div>
+      <h3>Zone lore</h3>
+      <p class="muted" style="font-style: normal; line-height: 1.65;">${lore.line}</p>
+      <p class="muted" style="font-style: normal; line-height: 1.65; margin-top: 8px;">
+        Region: ${lore.region} · particle <em>${lore.particle}</em><br>
+        Syzygy ${z}::${twin} — <em>${demon}</em>${current ? `<br>Current: ${current[0]} (${current[1]}→${current[2]})` : ''}
+      </p>
+      <button id="addAnotherBtn" style="margin-top: 16px; background: transparent; border: 1px solid var(--hairline-strong); color: var(--bone); padding: 7px 14px; cursor: pointer; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; width: 100%;">＋ add another word</button>`;
+    panelBody.querySelectorAll('.chip.member').forEach(chip => {
+      chip.addEventListener('click', () => removeWord(chip.dataset.word));
+    });
+    panelBody.querySelector('#addAnotherBtn').addEventListener('click', openAddPanel);
+    return;
+  }
+
   panelTitle.textContent = state.mode === 'rhyme'
     ? `Rhyme group “-${groupKey}”`
     : `Alliteration group “${groupKey.toUpperCase()}-”`;
@@ -738,6 +937,11 @@ function renderForcesPanel() {
         <input type="range" min="0" max="100" value="${isGrouping ? 100 : value}" data-type="${name}" ${isGrouping || isAltitude ? 'disabled' : ''}>
       </div>`;
   }).join('') + `
+      <div class="force-row ${state.draft ? '' : 'disabled'}" title="${state.draft ? 'the poem’s word order, traced through the map' : 'write in the Draft to trace the poem’s flow'}">
+        <span class="swatch" style="background:#d9be7c"></span>
+        <label>Poem flow <span class="mark">→</span></label>
+        <input type="range" min="0" max="100" value="${Math.round((state.forceWeights.flow || 0) * 100)}" data-type="flow" ${state.draft ? '' : 'disabled'}>
+      </div>
       <div class="force-row alt-row">
         <span class="swatch" style="background:${CONNECTION_TYPES.syllables.color}; opacity:0.5"></span>
         <label style="width:auto; cursor:pointer; display:flex; align-items:center; gap:6px;">
@@ -958,10 +1162,16 @@ function updateDraftGutter() {
   draftGutter.scrollTop = draftText.scrollTop;
 }
 
+let flowRefreshTimer = null;
 draftText.addEventListener('input', () => {
   state.draft = draftText.value;
   saveState();
   updateDraftGutter();
+  // retrace poem flow as the draft changes
+  if (state.forceWeights.flow > 0) {
+    clearTimeout(flowRefreshTimer);
+    flowRefreshTimer = setTimeout(refreshGraph, 900);
+  }
 });
 draftText.addEventListener('scroll', () => { draftGutter.scrollTop = draftText.scrollTop; });
 
@@ -1311,6 +1521,9 @@ document.querySelectorAll('#modeToggle button').forEach(btn => {
     closePanel();
     saveState();
     refreshGraph();
+    if (state.words.length) {
+      setTimeout(() => Graph.zoomToFit(800, 40, n => n.type !== 'plus'), 1300);
+    }
   });
 });
 

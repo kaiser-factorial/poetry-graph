@@ -245,7 +245,9 @@
             <div class="chips" id="cutChips"></div>
 
             <p class="note">Words that end a line are shown in <b>brass</b> on the map — they carry
-            the rhyme scheme. Function words (the, and, of…) are left out entirely.</p>
+            the rhyme scheme. Function words (the, and, of…) are left out entirely.
+            The poem's <b>flow</b> — its word order — arrives traced as moving particles;
+            switch the map to <b>Numogram</b> mode to watch it cross the zones.</p>
 
             <button class="open-map" id="openMapBtn">open the sound map →</button>
         </div>
@@ -410,7 +412,7 @@ Nothing gold can stay.`;
                     syllables: w.syllables || 1,
                     lineEnd: !!w.lineEnd,
                 })),
-                forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0 },
+                forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, flow: 0.4 },
                 syllableAltitude: false,
                 draft: document.querySelector('#poemInput').value,
                 form: null, formSlots: {}, formBodies: {},
