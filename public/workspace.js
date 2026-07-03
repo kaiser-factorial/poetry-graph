@@ -1194,6 +1194,8 @@ function renderForcesPanel() {
             `<option value="${k}" ${ui.musicKey === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
           <select id="musicScaleSel">${Object.entries(SCALES).map(([id, s]) =>
             `<option value="${id}" ${ui.musicScale === id ? 'selected' : ''}>${s.label}</option>`).join('')}</select>
+          <select id="musicTempoSel">${Object.entries(TEMPOS).map(([id, t]) =>
+            `<option value="${id}" ${ui.musicTempo === id ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
         </div>
       </div>
       <div class="force-row cam-row">
@@ -1241,6 +1243,10 @@ function renderForcesPanel() {
   });
   rows.querySelector('#musicScaleSel')?.addEventListener('change', e => {
     ui.musicScale = e.target.value;
+    saveUi();
+  });
+  rows.querySelector('#musicTempoSel')?.addEventListener('change', e => {
+    ui.musicTempo = e.target.value;
     saveUi();
   });
 
@@ -1772,10 +1778,12 @@ try {
     scansion: !!savedUi.scansion,
     musicKey: savedUi.musicKey || 'A',
     musicScale: savedUi.musicScale || 'pentatonic',
+    musicTempo: savedUi.musicTempo || 'andante',
   };
 } catch (e) { /* defaults */ }
 ui.musicKey = ui.musicKey || 'A';
 ui.musicScale = ui.musicScale || 'pentatonic';
+ui.musicTempo = ui.musicTempo || 'andante';
 
 function saveUi() {
   localStorage.setItem(UI_KEY, JSON.stringify(ui));
@@ -2059,6 +2067,22 @@ const SCALES = {
 };
 const KEYS = { 'A': 0, 'B♭': 1, 'B': 2, 'C': 3, 'D♭': 4, 'D': 5, 'E♭': 6, 'E': 7, 'F': 8, 'G♭': 9, 'G': 10, 'A♭': 11 };
 
+const TEMPOS = {
+  largo: { label: 'largo', mult: 0.55 },
+  adagio: { label: 'adagio', mult: 0.75 },
+  andante: { label: 'andante', mult: 1 },
+  allegro: { label: 'allegro', mult: 1.4 },
+  presto: { label: 'presto', mult: 1.9 },
+};
+
+function tempoMult() {
+  return (TEMPOS[ui.musicTempo] || TEMPOS.andante).mult;
+}
+
+function sylMs() {
+  return SYL_MS / tempoMult();
+}
+
 function musicScale() {
   return SCALES[ui.musicScale] || SCALES.pentatonic;
 }
@@ -2109,7 +2133,7 @@ function playWord(text, stress, syllables) {
   for (let k = 0; k < syllables; k++) {
     const digit = stress ? stress[k] : null;
     const amp = digit === '0' ? 0.05 : digit ? 0.17 : 0.1;
-    playPulse(freq, (k * SYL_MS) / 1000, amp);
+    playPulse(freq, (k * sylMs()) / 1000, amp);
   }
 }
 
@@ -2234,11 +2258,12 @@ async function startPerformance() {
     }
     playWord(cur.text, stress, syllables);
 
-    // the word takes as long as its syllables; lines and stanzas breathe
-    let delay = syllables * SYL_MS + GAP_MS;
+    // the word takes as long as its syllables; lines and stanzas breathe;
+    // tempo divides everything (read live, so it can change mid-ritual)
+    let delay = syllables * sylMs() + GAP_MS / tempoMult();
     const next = seq[i + 1];
     if (next && next.line > cur.line) {
-      delay += LINE_PAUSE_MS + (next.line - cur.line - 1) * BLANK_LINE_MS;
+      delay += (LINE_PAUSE_MS + (next.line - cur.line - 1) * BLANK_LINE_MS) / tempoMult();
     }
     i++;
     performTimer = setTimeout(step, delay);
