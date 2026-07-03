@@ -377,6 +377,26 @@
             border-top: 1px solid var(--hairline);
         }
 
+        .force-row.cam-row { margin-top: 8px; }
+        .force-row.cam-row label { width: 68px; color: var(--muted); }
+
+        .cam-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+
+        .cam-btns button {
+            background: transparent;
+            border: 1px solid var(--hairline);
+            color: var(--muted);
+            padding: 2px 9px;
+            cursor: pointer;
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            transition: all 0.2s ease;
+        }
+
+        .cam-btns button:hover { color: var(--bone); border-color: var(--hairline-strong); }
+        .cam-btns button.on { color: var(--brass); border-color: rgba(179, 149, 84, 0.55); }
+
         .forces .hint {
             font-size: 0.64rem;
             color: var(--muted);
@@ -734,6 +754,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=12"></script>
+    <script type="module" src="workspace.js?v=13"></script>
 </body>
 </html>

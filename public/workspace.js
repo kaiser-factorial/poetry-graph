@@ -119,7 +119,19 @@ const ZONE_REGION = {
   0: 'plex', 1: 'torque', 2: 'torque', 3: 'warp', 4: 'torque',
   5: 'torque', 6: 'warp', 7: 'torque', 8: 'torque', 9: 'plex',
 };
-const REGION_DEPTH = { torque: 0, warp: 110, plex: -110 };
+const REGION_DEPTH = { torque: 0, warp: 160, plex: -160 };
+
+// Barker spiral layout: each syzygy is one turn of an expanding helix —
+// 4::5 innermost, 0::9 outermost — twins diametrically opposed on their loop.
+const SPIRAL_PAIR_INDEX = { 4: 0, 5: 0, 3: 1, 6: 1, 2: 2, 7: 2, 1: 3, 8: 3, 0: 4, 9: 4 };
+
+function spiralZonePos(z) {
+  const i = SPIRAL_PAIR_INDEX[z];
+  const isLowerTwin = z === [4, 3, 2, 1, 0][i];
+  const r = 40 + i * 46;
+  const angle = i * 1.05 + (isLowerTwin ? 0 : Math.PI);
+  return [Math.cos(angle) * r, (i - 2) * 62, Math.sin(angle) * r];
+}
 const ZONE_LORE = {
   0: { planet: 'Sol', region: 'plex', particle: 'eiaoung', line: 'Dense void of the cosmic hypermatrix — flatline and loss of signal.' },
   1: { planet: 'Mercury', region: 'torque', particle: 'gl', line: 'Meta-static pod-deliria and techno-immortalism; the Door of Doors.' },
@@ -172,6 +184,7 @@ let state = {
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
   forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, flow: 0 },
   syllableAltitude: false, // words stratify vertically by syllable count
+  numoLayout: 'plate', // numogram geometry: 'plate' (canonical) | 'spiral' (Barker)
   draft: '', // the poem-in-progress, written in the Draft drawer
   form: null, // active poetic-form template (key into FORMS)
   formSlots: {}, // end-word slot values, e.g. { A1: 'night' }
@@ -193,6 +206,7 @@ function loadState() {
         state.words = parsed.words;
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
+        state.numoLayout = parsed.numoLayout === 'spiral' ? 'spiral' : 'plate';
         state.draft = parsed.draft || '';
         state.form = parsed.form || null;
         state.formSlots = parsed.formSlots || {};
@@ -251,9 +265,16 @@ function buildGraphData() {
       let node = nodeCache.get(id);
       if (node && (node.memberCount !== memberCount)) delete node.__threeObj;
       node = cachedNode(id, { type: 'hub', key, label: hubLabel(key), zone: z, memberCount });
-      node.fx = (ZONE_POS[z][0] - NUMO_CENTER[0]) * scale;
-      node.fy = -(ZONE_POS[z][1] - NUMO_CENTER[1]) * scale;
-      node.fz = REGION_DEPTH[ZONE_REGION[z]] * scale;
+      if (state.numoLayout === 'spiral') {
+        const [sx, sy, sz] = spiralZonePos(z);
+        node.fx = sx * scale * 1.6;
+        node.fy = sy * scale * 1.6;
+        node.fz = sz * scale * 1.6;
+      } else {
+        node.fx = (ZONE_POS[z][0] - NUMO_CENTER[0]) * scale;
+        node.fy = -(ZONE_POS[z][1] - NUMO_CENTER[1]) * scale;
+        node.fz = REGION_DEPTH[ZONE_REGION[z]] * scale;
+      }
       if (node.x === undefined) { node.x = node.fx; node.y = node.fy; node.z = node.fz; }
       nodes.push(node);
     }
@@ -933,6 +954,38 @@ async function openGroupPanel(groupKey) {
   });
 }
 
+// ===== Camera axis locks =====
+// "spin" pins the polar angle (rotate around the vertical axis only);
+// "tilt" pins the azimuth (pitch over the top only); "face" squares up.
+function applyCamLock() {
+  const controls = Graph.controls();
+  controls.minPolarAngle = 0;
+  controls.maxPolarAngle = Math.PI;
+  controls.minAzimuthAngle = -Infinity;
+  controls.maxAzimuthAngle = Infinity;
+  if (ui.camLock === 'turntable') {
+    const p = controls.getPolarAngle();
+    controls.minPolarAngle = p;
+    controls.maxPolarAngle = p;
+  } else if (ui.camLock === 'tilt') {
+    const a = controls.getAzimuthalAngle();
+    controls.minAzimuthAngle = a;
+    controls.maxAzimuthAngle = a;
+  }
+}
+
+function faceThePlate() {
+  const prev = ui.camLock;
+  ui.camLock = 'free';
+  applyCamLock();
+  Graph.cameraPosition({ x: 0, y: 0, z: 520 }, { x: 0, y: 0, z: 0 }, 800);
+  setTimeout(() => {
+    if (state.mode !== 'gematria') Graph.zoomToFit(600, 40, n => n.type !== 'plus');
+    else Graph.zoomToFit(600, 40, n => n.type === 'hub');
+  }, 900);
+  setTimeout(() => { ui.camLock = prev; applyCamLock(); }, 1700);
+}
+
 // ===== Forces panel =====
 function renderForcesPanel() {
   const wrap = document.querySelector('#forces');
@@ -966,7 +1019,24 @@ function renderForcesPanel() {
           <input type="checkbox" id="altToggle" ${state.syllableAltitude ? 'checked' : ''}>
           syllables as altitude
         </label>
-      </div>`;
+      </div>
+      <div class="force-row cam-row">
+        <label>Camera</label>
+        <div class="cam-btns">
+          <button data-cam="free" class="${ui.camLock === 'free' ? 'on' : ''}" title="orbit freely">free</button>
+          <button data-cam="turntable" class="${ui.camLock === 'turntable' ? 'on' : ''}" title="rotate around the vertical axis only">spin</button>
+          <button data-cam="tilt" class="${ui.camLock === 'tilt' ? 'on' : ''}" title="pitch over the top only">tilt</button>
+          <button data-cam="face" title="square up to the graph">face</button>
+        </div>
+      </div>
+      ${state.mode === 'gematria' ? `
+      <div class="force-row cam-row">
+        <label>Numogram</label>
+        <div class="cam-btns">
+          <button data-layout="plate" class="${state.numoLayout === 'plate' ? 'on' : ''}" title="the canonical decimal labyrinth, regions folded in depth">plate</button>
+          <button data-layout="spiral" class="${state.numoLayout === 'spiral' ? 'on' : ''}" title="Barker spiral — syzygies as turns of a helix, 4::5 innermost">spiral</button>
+        </div>
+      </div>` : ''}`;
 
   rows.querySelectorAll('input[type="range"]').forEach(slider => {
     slider.addEventListener('input', () => {
@@ -981,6 +1051,27 @@ function renderForcesPanel() {
     saveState();
     applyAltitudeForce();
     refreshGraph();
+  });
+
+  rows.querySelectorAll('[data-cam]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.cam === 'face') { faceThePlate(); return; }
+      ui.camLock = btn.dataset.cam;
+      saveUi();
+      applyCamLock();
+      rows.querySelectorAll('[data-cam]').forEach(b =>
+        b.classList.toggle('on', b.dataset.cam === ui.camLock));
+    });
+  });
+
+  rows.querySelectorAll('[data-layout]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (state.numoLayout === btn.dataset.layout) return;
+      state.numoLayout = btn.dataset.layout;
+      saveState();
+      refreshGraph();
+      setTimeout(() => Graph.zoomToFit(800, 40, n => n.type === 'hub'), 1200);
+    });
   });
 }
 
@@ -1407,10 +1498,15 @@ document.querySelector('#draftClose').addEventListener('click', () => {
 // Every floating box can be dragged by its header and collapsed to a bar;
 // positions and collapsed states persist.
 const UI_KEY = 'poetry-workspace-ui-v1';
-let ui = { collapsed: {}, pos: {}, size: {} };
+let ui = { collapsed: {}, pos: {}, size: {}, camLock: 'free' };
 try {
   const savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
-  ui = { collapsed: savedUi.collapsed || {}, pos: savedUi.pos || {}, size: savedUi.size || {} };
+  ui = {
+    collapsed: savedUi.collapsed || {},
+    pos: savedUi.pos || {},
+    size: savedUi.size || {},
+    camLock: ['turntable', 'tilt'].includes(savedUi.camLock) ? savedUi.camLock : 'free',
+  };
 } catch (e) { /* defaults */ }
 
 function saveUi() {
@@ -1609,6 +1705,7 @@ fontsReady.then(() => initFromSeed()).then(async seeded => {
     b.classList.toggle('active', b.dataset.mode === state.mode));
   if (!seeded) await backfillMeta();
   applyAltitudeForce();
+  applyCamLock();
   refreshGraph();
   if (state.mode === 'gematria') {
     Graph.cameraPosition({ x: 0, y: 0, z: 520 }, { x: 0, y: 0, z: 0 }, 0);
