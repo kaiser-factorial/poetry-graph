@@ -2009,6 +2009,186 @@ function initFromShare() {
   }
 }
 
+// ===== Ritual playback =====
+// The poem performs itself: the camera glides word to word along the
+// draft's order, each word flares as it sounds its zone — a pentatonic
+// pitch from its AQ digital root — over a low drone.
+let performing = false;
+let performTimer = null;
+let audioCtx = null;
+let droneGain = null;
+let savedCamLock = null;
+
+const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // zone 0–9 → semitones above A3
+
+function toneFor(text) {
+  return 220 * Math.pow(2, PENTATONIC[digitalRoot(aqValue(text))] / 12);
+}
+
+function playTone(freq) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(0.13, t + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.8);
+  // a faint octave above, for shimmer
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'triangle';
+  osc2.frequency.value = freq * 2;
+  gain2.gain.setValueAtTime(0, t);
+  gain2.gain.linearRampToValueAtTime(0.03, t + 0.04);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+  osc2.connect(gain2).connect(audioCtx.destination);
+  osc2.start(t);
+  osc2.stop(t + 0.65);
+}
+
+function startDrone() {
+  const t = audioCtx.currentTime;
+  droneGain = audioCtx.createGain();
+  droneGain.gain.setValueAtTime(0, t);
+  droneGain.gain.linearRampToValueAtTime(0.032, t + 1.5);
+  droneGain.connect(audioCtx.destination);
+  for (const f of [110, 164.8]) { // root + fifth
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    osc.connect(droneGain);
+    osc.start(t);
+    droneGain._oscs = (droneGain._oscs || []).concat(osc);
+  }
+}
+
+function stopDrone() {
+  if (!droneGain) return;
+  const t = audioCtx.currentTime;
+  droneGain.gain.linearRampToValueAtTime(0, t + 1.2);
+  const g = droneGain;
+  setTimeout(() => g._oscs?.forEach(o => o.stop()), 1400);
+  droneGain = null;
+}
+
+// Every mapped word of the draft, in order, with its line number
+function performanceSequence() {
+  const have = new Set(state.words.map(w => w.text));
+  const seq = [];
+  const lines = (state.draft || '').replace(/[’‘]/g, "'").toLowerCase().split('\n');
+  lines.forEach((line, li) => {
+    for (const tok of (line.match(/[a-z']+/g) || [])) {
+      const clean = tok.replace(/'/g, '');
+      if (have.has(clean)) seq.push({ text: clean, line: li });
+    }
+  });
+  return seq;
+}
+
+function flyToNode(node) {
+  const cam = Graph.cameraPosition();
+  const dx = cam.x - node.x, dy = cam.y - node.y, dz = cam.z - node.z;
+  const d = Math.hypot(dx, dy, dz) || 1;
+  const dist = 130;
+  Graph.cameraPosition(
+    { x: node.x + (dx / d) * dist, y: node.y + (dy / d) * dist, z: node.z + (dz / d) * dist },
+    { x: node.x, y: node.y, z: node.z },
+    880
+  );
+}
+
+function pulseWord(node) {
+  setWordLabelColor(node, '#ffffff');
+  node.__threeObj?.scale.setScalar(1.4);
+  setTimeout(() => {
+    node.__threeObj?.scale.setScalar(1);
+    setWordLabelColor(node, wordLabelColor(node.word));
+  }, 780);
+}
+
+function highlightPerformLine(li) {
+  if (state.form) return; // template mode has no gutter
+  draftGutter.querySelectorAll('div').forEach((d, i) => d.classList.toggle('playing', i === li));
+  const lh = parseFloat(getComputedStyle(draftText).lineHeight) || 28;
+  draftText.scrollTop = Math.max(0, li * lh - draftText.clientHeight / 2);
+  draftGutter.scrollTop = draftText.scrollTop;
+}
+
+async function startPerformance() {
+  const seq = performanceSequence();
+  if (!seq.length) {
+    openDraft();
+    if (!state.form) draftText.focus();
+    return;
+  }
+  performing = true;
+  const btn = document.querySelector('#performBtn');
+  btn.textContent = 'Stop';
+  btn.classList.add('on');
+
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  startDrone();
+
+  savedCamLock = ui.camLock;
+  ui.camLock = 'free';
+  applyCamLock();
+
+  if (draftEl.style.display === 'none') openDraft();
+
+  let i = 0;
+  const step = () => {
+    if (!performing || i >= seq.length) { stopPerformance(); return; }
+    const { text, line } = seq[i];
+    const node = nodeCache.get(`w:${text}`);
+    highlightPerformLine(line);
+    if (node) {
+      flyToNode(node);
+      pulseWord(node);
+    }
+    playTone(toneFor(text));
+    i++;
+    performTimer = setTimeout(step, 950);
+  };
+  step();
+}
+
+function stopPerformance() {
+  if (!performing && !performTimer) return;
+  performing = false;
+  clearTimeout(performTimer);
+  performTimer = null;
+  stopDrone();
+
+  const btn = document.querySelector('#performBtn');
+  btn.textContent = 'Perform';
+  btn.classList.remove('on');
+  draftGutter.querySelectorAll('.playing').forEach(d => d.classList.remove('playing'));
+
+  if (savedCamLock !== null) {
+    ui.camLock = savedCamLock;
+    savedCamLock = null;
+  }
+  setTimeout(() => {
+    Graph.zoomToFit(1200, 40, n => n.type !== 'plus');
+    setTimeout(applyCamLock, 1300);
+  }, 500);
+}
+
+document.querySelector('#performBtn').addEventListener('click', () => {
+  if (performing) stopPerformance();
+  else startPerformance();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && performing) stopPerformance();
+});
+
 // ===== Toolbar =====
 document.querySelector('#panelClose').addEventListener('click', closePanel);
 document.querySelector('#addWordBtn').addEventListener('click', openAddPanel);

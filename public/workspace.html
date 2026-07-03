@@ -508,6 +508,22 @@
 
         .export-btn:hover { border-color: var(--brass); color: var(--brass); }
 
+        #performBtn.on {
+            color: var(--brass);
+            border-color: rgba(179, 149, 84, 0.55);
+            animation: perform-breathe 2.2s ease-in-out infinite;
+        }
+
+        @keyframes perform-breathe {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(179, 149, 84, 0); }
+            50% { box-shadow: 0 0 14px 0 rgba(179, 149, 84, 0.35); }
+        }
+
+        .draft-gutter div.playing {
+            color: var(--brass);
+            background: rgba(179, 149, 84, 0.13);
+        }
+
         .draft-body textarea {
             flex: 1;
             background: transparent;
@@ -720,6 +736,7 @@
             </div>
             <button class="button primary" id="addWordBtn">＋ Add Word</button>
             <button class="button" id="draftBtn">Draft</button>
+            <button class="button" id="performBtn" title="the poem plays itself across the map — camera, light, and tone">Perform</button>
             <button class="button" id="exportBtn">Export</button>
             <button class="button" id="newPoemBtn">New Poem</button>
             <a href="read.html">Read</a>
@@ -782,6 +799,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=17"></script>
+    <script type="module" src="workspace.js?v=18"></script>
 </body>
 </html>
