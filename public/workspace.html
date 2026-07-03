@@ -431,7 +431,7 @@
         }
 
         .draft-gutter {
-            width: 34px;
+            width: 74px;
             flex-shrink: 0;
             overflow: hidden;
             text-align: right;
@@ -445,7 +445,22 @@
             line-height: 1.75;
             font-size: 0.68rem;
             height: calc(1.05rem * 1.75);
+            white-space: nowrap;
         }
+
+        .draft-gutter .aq {
+            color: #b0705c;
+            margin-left: 7px;
+            opacity: 0.85;
+        }
+
+        .draft-gutter .aq-zone {
+            color: var(--muted);
+            font-size: 0.85em;
+            margin-left: 2px;
+        }
+
+        .draft-gutter .aq-zone::before { content: '→'; margin-right: 1px; opacity: 0.6; }
 
         .draft-body textarea {
             flex: 1;
@@ -719,6 +734,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=11"></script>
+    <script type="module" src="workspace.js?v=12"></script>
 </body>
 </html>

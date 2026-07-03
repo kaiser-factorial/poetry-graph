@@ -108,6 +108,18 @@ const SYZYGY_PAIRS = [
 const NUMO_CURRENTS = [
   ['Surge', 8, 7], ['Hold', 2, 5], ['Sink', 4, 1], ['Warp', 6, 3],
 ];
+// Gates: zone-n jumps to the digital root of its cumulation (triangular
+// number). Self-loops (Gt-00, Gt-01, Gt-45) are omitted from the drawing.
+const NUMO_GATES = [
+  ['Gt-03', 2, 3], ['Gt-06', 3, 6], ['Gt-10', 4, 1], ['Gt-15', 5, 6],
+  ['Gt-21', 6, 3], ['Gt-28', 7, 1], ['Gt-36', 8, 9],
+];
+// The third axis: regions fold out of the plate — warp lifts, plex sinks
+const ZONE_REGION = {
+  0: 'plex', 1: 'torque', 2: 'torque', 3: 'warp', 4: 'torque',
+  5: 'torque', 6: 'warp', 7: 'torque', 8: 'torque', 9: 'plex',
+};
+const REGION_DEPTH = { torque: 0, warp: 110, plex: -110 };
 const ZONE_LORE = {
   0: { planet: 'Sol', region: 'plex', particle: 'eiaoung', line: 'Dense void of the cosmic hypermatrix — flatline and loss of signal.' },
   1: { planet: 'Mercury', region: 'torque', particle: 'gl', line: 'Meta-static pod-deliria and techno-immortalism; the Door of Doors.' },
@@ -241,8 +253,8 @@ function buildGraphData() {
       node = cachedNode(id, { type: 'hub', key, label: hubLabel(key), zone: z, memberCount });
       node.fx = (ZONE_POS[z][0] - NUMO_CENTER[0]) * scale;
       node.fy = -(ZONE_POS[z][1] - NUMO_CENTER[1]) * scale;
-      node.fz = 0;
-      if (node.x === undefined) { node.x = node.fx; node.y = node.fy; node.z = 0; }
+      node.fz = REGION_DEPTH[ZONE_REGION[z]] * scale;
+      if (node.x === undefined) { node.x = node.fx; node.y = node.fy; node.z = node.fz; }
       nodes.push(node);
     }
     for (const word of state.words) {
@@ -254,6 +266,9 @@ function buildGraphData() {
     }
     for (const [, from, to] of NUMO_CURRENTS) {
       links.push({ source: `hub:gematria:${from}`, target: `hub:gematria:${to}`, kind: 'current' });
+    }
+    for (const [, from, to] of NUMO_GATES) {
+      links.push({ source: `hub:gematria:${from}`, target: `hub:gematria:${to}`, kind: 'gate' });
     }
     addCrossLinks(links);
     addFlowLinks(links);
@@ -369,6 +384,7 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
     if (link.kind === 'member') return 'rgba(232,226,211,0.6)';
     if (link.kind === 'syzygy') return 'rgba(232,226,211,0.35)';
     if (link.kind === 'current') return '#b0705c';
+    if (link.kind === 'gate') return '#8a94b8';
     if (link.kind === 'flow') return '#d9be7c';
     return CONNECTION_TYPES[link.kind].color;
   })
@@ -377,11 +393,13 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
     if (link.kind === 'member') return 0.4;
     if (link.kind === 'syzygy') return 0.25;
     if (link.kind === 'current') return 0.55;
+    if (link.kind === 'gate') return 0.3;
     if (link.kind === 'flow') return 0.5;
     return 0.3 + (state.forceWeights[link.kind] || 0) * 0.9;
   })
-  .linkDirectionalParticles(link => link.kind === 'flow' ? 3 : link.kind === 'current' ? 2 : 0)
-  .linkDirectionalParticleSpeed(link => link.kind === 'flow' ? 0.006 : 0.0035)
+  .linkCurvature(link => link.kind === 'gate' ? 0.4 : link.kind === 'current' ? 0.12 : 0)
+  .linkDirectionalParticles(link => link.kind === 'flow' ? 3 : link.kind === 'current' ? 2 : link.kind === 'gate' ? 1 : 0)
+  .linkDirectionalParticleSpeed(link => link.kind === 'flow' ? 0.006 : link.kind === 'gate' ? 0.002 : 0.0035)
   .linkDirectionalParticleWidth(1.7)
   .onNodeClick(node => {
     if (node.type === 'plus') { openAddPanel(); return; }
@@ -430,7 +448,7 @@ Graph.d3Force('link')
   })
   .strength(link => {
     if (link.kind === 'member') return 0.9;
-    if (link.kind === 'syzygy' || link.kind === 'current') return 0; // decorative: both ends pinned
+    if (['syzygy', 'current', 'gate'].includes(link.kind)) return 0; // decorative: both ends pinned
     if (link.kind === 'flow') return 0.2 * (state.forceWeights.flow || 0);
     return 0.35 * (state.forceWeights[link.kind] || 0);
   });
@@ -1155,9 +1173,20 @@ function lineSyllables(line) {
   }, 0);
 }
 
+function lineAq(line) {
+  const tokens = line.toLowerCase().match(/[a-z0-9']+/g) || [];
+  if (!tokens.length) return null;
+  return tokens.reduce((sum, t) => sum + aqValue(t.replace(/'/g, '')), 0);
+}
+
 function updateDraftGutter() {
   draftGutter.innerHTML = draftText.value.split('\n')
-    .map(line => `<div>${lineSyllables(line)}</div>`)
+    .map(line => {
+      const aq = lineAq(line);
+      const aqSpan = aq === null ? ''
+        : `<span class="aq" title="AQ ${plexSteps(aq)}">${aq}<span class="aq-zone">${digitalRoot(aq)}</span></span>`;
+      return `<div>${lineSyllables(line)}${aqSpan}</div>`;
+    })
     .join('');
   draftGutter.scrollTop = draftText.scrollTop;
 }
@@ -1521,7 +1550,11 @@ document.querySelectorAll('#modeToggle button').forEach(btn => {
     closePanel();
     saveState();
     refreshGraph();
-    if (state.words.length) {
+    if (mode === 'gematria') {
+      // face the plate — otherwise the pinned diagram can appear edge-on
+      Graph.cameraPosition({ x: 0, y: 0, z: 520 }, { x: 0, y: 0, z: 0 }, 900);
+      setTimeout(() => Graph.zoomToFit(800, 40, n => n.type === 'hub'), 1300);
+    } else if (state.words.length) {
       setTimeout(() => Graph.zoomToFit(800, 40, n => n.type !== 'plus'), 1300);
     }
   });
@@ -1577,7 +1610,10 @@ fontsReady.then(() => initFromSeed()).then(async seeded => {
   if (!seeded) await backfillMeta();
   applyAltitudeForce();
   refreshGraph();
-  if (state.words.length) {
+  if (state.mode === 'gematria') {
+    Graph.cameraPosition({ x: 0, y: 0, z: 520 }, { x: 0, y: 0, z: 0 }, 0);
+    setTimeout(() => Graph.zoomToFit(900, 40, n => n.type === 'hub'), 1400);
+  } else if (state.words.length) {
     // frame the poem once the layout settles (the + node roams, so skip it)
     setTimeout(() => Graph.zoomToFit(900, 40, n => n.type !== 'plus'), 1400);
   }
