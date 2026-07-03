@@ -2179,24 +2179,48 @@ function performanceSequence() {
   return seq;
 }
 
+// Damped camera follow: instead of discrete tweens (which jerk on
+// retargets and direction reversals), the camera eases a fraction toward
+// the current word every frame — reversals bend the path, never snap it.
+let camTarget = null;
+
 function flyToNode(node) {
   const cam = Graph.cameraPosition();
   const dx = cam.x - node.x, dy = cam.y - node.y, dz = cam.z - node.z;
   const d = Math.hypot(dx, dy, dz) || 1;
   const dist = 130;
-  Graph.cameraPosition(
-    { x: node.x + (dx / d) * dist, y: node.y + (dy / d) * dist, z: node.z + (dz / d) * dist },
-    { x: node.x, y: node.y, z: node.z },
-    880
-  );
+  camTarget = {
+    pos: new THREE.Vector3(node.x + (dx / d) * dist, node.y + (dy / d) * dist, node.z + (dz / d) * dist),
+    look: new THREE.Vector3(node.x, node.y, node.z),
+  };
 }
 
+function camFollowLoop() {
+  if (!performing) { camTarget = null; return; }
+  if (camTarget) {
+    const cam = Graph.camera();
+    const controls = Graph.controls();
+    cam.position.lerp(camTarget.pos, 0.045);
+    controls.target.lerp(camTarget.look, 0.06);
+    controls.update();
+  }
+  requestAnimationFrame(camFollowLoop);
+}
+
+// The word of the moment flares verdigris — nothing else in the scene is
+// teal, so the eye finds it instantly among the bone and brass.
+const PERFORM_COLOR = '#9fe0cf';
+
 function pulseWord(node) {
-  setWordLabelColor(node, '#ffffff');
+  setWordLabelColor(node, PERFORM_COLOR);
+  const dot = node.__threeObj?.children.find(c => c.isMesh);
+  if (dot) dot.material.color.set(PERFORM_COLOR);
   node.__threeObj?.scale.setScalar(1.4);
   setTimeout(() => {
     node.__threeObj?.scale.setScalar(1);
     setWordLabelColor(node, wordLabelColor(node.word));
+    const d = node.__threeObj?.children.find(c => c.isMesh);
+    if (d) d.material.color.set(POS_TINTS[node.word.pos?.[0]] ?? 0x9b9588);
   }, 780);
 }
 
@@ -2236,6 +2260,7 @@ async function startPerformance() {
   savedCamLock = ui.camLock;
   ui.camLock = 'free';
   applyCamLock();
+  camFollowLoop();
 
   if (draftEl.style.display === 'none') openDraft();
 
