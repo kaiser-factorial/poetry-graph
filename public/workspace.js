@@ -181,6 +181,29 @@ const CONNECTION_TYPES = {
     color: '#b0705c',
     keyOf: w => zoneOf(w.text),
   },
+  // Pairwise layers: no grouping key — links are declared per word-pair
+  meaning: {
+    label: 'Meaning',
+    color: '#7ba8a0',
+    pairs: words => {
+      const out = [];
+      for (let i = 0; i < words.length; i++) {
+        for (let j = i + 1; j < words.length; j++) {
+          const a = words[i], b = words[j];
+          if (a.similar?.includes(b.text) || b.similar?.includes(a.text)) out.push([a.text, b.text]);
+        }
+      }
+      return out;
+    },
+  },
+  bond: {
+    label: 'Your bonds',
+    color: '#e3d9c0',
+    pairs: words => {
+      const have = new Set(words.map(w => w.text));
+      return (state.customEdges || []).filter(([a, b]) => have.has(a) && have.has(b));
+    },
+  },
 };
 
 const BONE = '#e8e2d3';
@@ -191,7 +214,8 @@ const SERIF = '"Cormorant Garamond", serif';
 let state = {
   mode: 'rhyme', // grouping: 'rhyme' | 'alliteration'
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
-  forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, flow: 0 },
+  forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, meaning: 0.4, bond: 0.7, flow: 0 },
+  customEdges: [], // hand-drawn word pairs (shift-click two words)
   syllableAltitude: false, // words stratify vertically by syllable count
   numoLayout: 'plate', // numogram geometry: 'plate' (canonical) | 'spiral' (Barker)
   draft: '', // the poem-in-progress, written in the Draft drawer
@@ -216,6 +240,7 @@ function loadState() {
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
         state.numoLayout = parsed.numoLayout === 'spiral' ? 'spiral' : 'plate';
+        state.customEdges = Array.isArray(parsed.customEdges) ? parsed.customEdges : [];
         state.draft = parsed.draft || '';
         state.form = parsed.form || null;
         state.formSlots = parsed.formSlots || {};
@@ -357,6 +382,14 @@ function addCrossLinks(links) {
     if (typeName === state.mode) continue;
     if (typeName === 'syllables' && state.syllableAltitude) continue; // shown as altitude instead
     if (!(state.forceWeights[typeName] > 0)) continue;
+
+    if (type.pairs) {
+      for (const [a, b] of type.pairs(state.words)) {
+        links.push({ source: `w:${a}`, target: `w:${b}`, kind: typeName });
+      }
+      continue;
+    }
+
     const buckets = new Map();
     for (const word of state.words) {
       const key = type.keyOf(word);
@@ -406,7 +439,10 @@ const container = document.querySelector('#graph3d');
 
 // Orbit controls (not trackball): the camera never rolls, so "up" is always
 // up — the stable frame of reference syllable altitude needs.
-const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
+const Graph = new ForceGraph3D(container, {
+  controlType: 'orbit',
+  rendererConfig: { preserveDrawingBuffer: true, antialias: true },
+})
   .backgroundColor(INK)
   .showNavInfo(false)
   .nodeThreeObject(node => makeNodeObject(node))
@@ -431,8 +467,11 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
   .linkDirectionalParticles(link => link.kind === 'flow' ? 3 : link.kind === 'current' ? 2 : link.kind === 'gate' ? 1 : 0)
   .linkDirectionalParticleSpeed(link => link.kind === 'flow' ? 0.006 : link.kind === 'gate' ? 0.002 : 0.0035)
   .linkDirectionalParticleWidth(1.7)
-  .onNodeClick(node => {
+  .onNodeClick((node, event) => {
     if (node.type === 'plus') { openAddPanel(); return; }
+    // Shift-click two words to draw (or erase) a personal bond between them
+    if (node.type === 'word' && event?.shiftKey) { handleBondClick(node); return; }
+    if (pendingBond) clearPendingBond();
     // With a form template open, clicking a word fills the armed end-word box
     if (node.type === 'word' && state.form &&
         document.querySelector('#draft').style.display !== 'none') {
@@ -452,6 +491,39 @@ const Graph = new ForceGraph3D(container, { controlType: 'orbit' })
   .onBackgroundClick(() => { if (panelMode !== 'closed') closePanel(); });
 
 let hoveredNode = null;
+
+// ===== Hand-drawn bonds =====
+let pendingBond = null; // word node awaiting its partner
+
+function setWordLabelColor(node, color) {
+  const label = node.__threeObj?.children.find(c => c instanceof SpriteText);
+  if (label) label.color = color;
+}
+
+function clearPendingBond() {
+  if (pendingBond) setWordLabelColor(pendingBond, wordLabelColor(pendingBond.word));
+  pendingBond = null;
+}
+
+function handleBondClick(node) {
+  if (!pendingBond) {
+    pendingBond = node;
+    setWordLabelColor(node, '#b39554'); // armed
+    return;
+  }
+  if (pendingBond === node) { clearPendingBond(); return; }
+
+  const a = pendingBond.word.text;
+  const b = node.word.text;
+  const existing = state.customEdges.findIndex(
+    ([x, y]) => (x === a && y === b) || (x === b && y === a));
+  if (existing >= 0) state.customEdges.splice(existing, 1); // shift-click again to erase
+  else state.customEdges.push([a, b]);
+
+  clearPendingBond();
+  saveState();
+  refreshGraph();
+}
 
 function wordLabelColor(word) {
   return word.lineEnd ? '#d9be7c' : '#f2ede0';
@@ -758,6 +830,8 @@ async function fetchWordInfo(text) {
       syllables: localSyllables(text),
       pos: [],
       rhymes: [],
+      similar: [],
+      stress: null,
     };
   }
 }
@@ -793,6 +867,8 @@ async function addWord(text, { rhymeKey = null, onsetKey = null } = {}) {
     onsetKey: onsetKey || info.onset,
     pos: info.pos || [],
     syllables: info.syllables || localSyllables(clean),
+    stress: info.stress ?? null,
+    similar: (info.similar || []).slice(0, 18),
   };
   state.words.push(word);
 
@@ -807,6 +883,7 @@ async function addWord(text, { rhymeKey = null, onsetKey = null } = {}) {
 
 function removeWord(text) {
   state.words = state.words.filter(w => w.text !== text);
+  state.customEdges = state.customEdges.filter(([a, b]) => a !== text && b !== text);
   nodeCache.delete(`w:${text}`);
   saveState();
   refreshGraph();
@@ -817,14 +894,18 @@ function removeWord(text) {
   }
 }
 
-// Older saved words may lack pos/syllables — backfill quietly
+// Older saved words may lack newer metadata — backfill quietly
 async function backfillMeta() {
-  const missing = state.words.filter(w => w.pos === undefined || w.syllables === undefined);
+  const missing = state.words.filter(w =>
+    w.pos === undefined || w.syllables === undefined ||
+    w.similar === undefined || w.stress === undefined);
   if (!missing.length) return;
   await Promise.all(missing.map(async w => {
     const info = await fetchWordInfo(w.text);
     w.pos = info.pos || [];
     w.syllables = info.syllables || localSyllables(w.text);
+    w.stress = info.stress ?? null;
+    w.similar = (info.similar || []).slice(0, 18);
     const node = nodeCache.get(`w:${w.text}`);
     if (node) delete node.__threeObj; // size/tint depend on the new metadata
   }));
@@ -956,15 +1037,30 @@ async function openGroupPanel(groupKey) {
     ? `Rhyme group “-${groupKey}”`
     : `Alliteration group “${groupKey.toUpperCase()}-”`;
 
+  // Kindred meanings: the union of this group's semantic neighbors
+  const existingWords = new Set(state.words.map(w => w.text));
+  const kindred = [...new Set(members.flatMap(m => m.similar || []))]
+    .filter(w => !existingWords.has(w))
+    .slice(0, 12);
+
   panelBody.innerHTML = `
     <h3>In this poem</h3>
     <div class="chip-list">${members.map(memberChip).join('') || '<span class="muted">none yet</span>'}</div>
     <h3>${state.mode === 'rhyme' ? 'Rhymes' : 'Same starting sound'} — click to add</h3>
     <div class="chip-list" id="suggestionList"><span class="muted">loading…</span></div>
+    ${kindred.length ? `
+    <h3>Kindred meanings — click to add</h3>
+    <div class="chip-list" id="kindredList">${kindred.map(w => `<span class="chip" data-word="${w}">${w}</span>`).join('')}</div>` : ''}
     <button id="addAnotherBtn" style="margin-top: 16px; background: transparent; border: 1px solid var(--hairline-strong); color: var(--bone); padding: 7px 14px; cursor: pointer; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; width: 100%;">＋ add another word</button>`;
 
   panelBody.querySelectorAll('.chip.member').forEach(chip => {
     chip.addEventListener('click', () => removeWord(chip.dataset.word));
+  });
+  panelBody.querySelectorAll('#kindredList .chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      await addWord(chip.dataset.word);
+      openGroupPanel(groupKey);
+    });
   });
   panelBody.querySelector('#addAnotherBtn').addEventListener('click', openAddPanel);
 
@@ -1306,15 +1402,87 @@ function lineAq(line) {
   return tokens.reduce((sum, t) => sum + aqValue(t.replace(/'/g, '')), 0);
 }
 
+// ===== Scansion (CMU stress patterns) =====
+const stressCache = new Map(); // draft words not in the graph
+let stressFetchTimer = null;
+
+function stressOfToken(t) {
+  const inGraph = state.words.find(w => w.text === t);
+  if (inGraph && inGraph.stress !== undefined) return inGraph.stress;
+  return stressCache.has(t) ? stressCache.get(t) : undefined;
+}
+
+function lineScansion(line) {
+  const tokens = (line.toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''));
+  if (!tokens.length) return { marks: '', binary: '', complete: false };
+  let marks = [];
+  let binary = '';
+  let complete = true;
+  for (const t of tokens) {
+    const s = stressOfToken(t);
+    if (s) {
+      marks.push([...s].map(d => d === '0' ? '˘' : '´').join(''));
+      binary += [...s].map(d => d === '0' ? '0' : '1').join('');
+    } else {
+      marks.push('·'.repeat(localSyllables(t)));
+      complete = false;
+    }
+  }
+  return { marks: marks.join(' '), binary, complete };
+}
+
+const FOOT_NAMES = { '01': 'iambic', '10': 'trochaic', '001': 'anapestic', '100': 'dactylic' };
+const FEET_COUNT = ['', 'mono', 'di', 'tri', 'tetra', 'penta', 'hexa', 'hepta', 'octa'];
+
+function meterName(binary) {
+  if (binary.length < 4) return null;
+  for (const [foot, name] of Object.entries(FOOT_NAMES)) {
+    const feet = Math.round(binary.length / foot.length);
+    if (feet < 2 || feet >= FEET_COUNT.length) continue;
+    const ideal = foot.repeat(feet).slice(0, binary.length);
+    if (ideal === binary && binary.length % foot.length === 0) {
+      return `${name} ${FEET_COUNT[feet]}meter`;
+    }
+  }
+  return null;
+}
+
+// Quietly fetch stress for draft words that aren't in the graph yet
+function scheduleStressFetch(tokens) {
+  const unknown = [...new Set(tokens)].filter(t => stressOfToken(t) === undefined).slice(0, 30);
+  if (!unknown.length) return;
+  unknown.forEach(t => stressCache.set(t, null)); // mark in-flight
+  clearTimeout(stressFetchTimer);
+  stressFetchTimer = setTimeout(async () => {
+    await Promise.all(unknown.map(async t => {
+      const info = await fetchWordInfo(t);
+      stressCache.set(t, info.stress ?? null);
+    }));
+    updateDraftGutter();
+  }, 700);
+}
+
 function updateDraftGutter() {
-  draftGutter.innerHTML = draftText.value.split('\n')
-    .map(line => {
+  const lines = draftText.value.split('\n');
+
+  if (ui.scansion) {
+    const allTokens = [];
+    draftGutter.innerHTML = lines.map(line => {
+      const { marks, binary, complete } = lineScansion(line);
+      allTokens.push(...((line.toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''))));
+      const meter = complete && binary ? meterName(binary) : null;
+      const syl = lineSyllables(line);
+      return `<div class="scan ${meter ? 'metered' : ''}" title="${meter || (syl !== '' ? syl + ' syllables' : '')}">${marks}</div>`;
+    }).join('');
+    scheduleStressFetch(allTokens);
+  } else {
+    draftGutter.innerHTML = lines.map(line => {
       const aq = lineAq(line);
       const aqSpan = aq === null ? ''
         : `<span class="aq" title="AQ ${plexSteps(aq)}">${aq}<span class="aq-zone">${digitalRoot(aq)}</span></span>`;
       return `<div>${lineSyllables(line)}${aqSpan}</div>`;
-    })
-    .join('');
+    }).join('');
+  }
   draftGutter.scrollTop = draftText.scrollTop;
 }
 
@@ -1534,7 +1702,7 @@ document.querySelector('#draftClose').addEventListener('click', () => {
 // Every floating box can be dragged by its header and collapsed to a bar;
 // positions and collapsed states persist.
 const UI_KEY = 'poetry-workspace-ui-v1';
-let ui = { collapsed: {}, pos: {}, size: {}, camLock: 'free' };
+let ui = { collapsed: {}, pos: {}, size: {}, camLock: 'free', scansion: false };
 try {
   const savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
   ui = {
@@ -1542,6 +1710,7 @@ try {
     pos: savedUi.pos || {},
     size: savedUi.size || {},
     camLock: ['turntable', 'tilt'].includes(savedUi.camLock) ? savedUi.camLock : 'free',
+    scansion: !!savedUi.scansion,
   };
 } catch (e) { /* defaults */ }
 
@@ -1658,6 +1827,15 @@ setupFloatingPanel('panel', document.querySelector('#panel'));
 setupFloatingPanel('forces', document.querySelector('#forces'));
 setupFloatingPanel('draft', document.querySelector('#draft'));
 
+const scansionBtn = document.querySelector('#scansionBtn');
+scansionBtn.classList.toggle('on', !!ui.scansion);
+scansionBtn.addEventListener('click', () => {
+  ui.scansion = !ui.scansion;
+  saveUi();
+  scansionBtn.classList.toggle('on', ui.scansion);
+  updateDraftGutter();
+});
+
 window.addEventListener('resize', () => {
   for (const [name, pos] of Object.entries(ui.pos)) {
     const el = document.querySelector(`#${name === 'panel' ? 'panel' : name}`);
@@ -1668,9 +1846,130 @@ window.addEventListener('resize', () => {
   }
 });
 
+// ===== Export: engraved plate + share link =====
+function exportPlate() {
+  const glCanvas = container.querySelector('canvas');
+  if (!glCanvas) return;
+  const W = glCanvas.width;
+  const H = glCanvas.height;
+  const M = Math.round(W * 0.035);
+  const CAP = Math.round(H * 0.13);
+
+  const out = document.createElement('canvas');
+  out.width = W + M * 2;
+  out.height = H + M * 2 + CAP;
+  const ctx = out.getContext('2d');
+
+  ctx.fillStyle = '#0c0b10';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(glCanvas, M, M);
+
+  // engraved double frame
+  ctx.strokeStyle = 'rgba(232,226,211,0.55)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(M - 8, M - 8, W + 16, H + 16);
+  ctx.strokeStyle = 'rgba(232,226,211,0.2)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(M - 14, M - 14, W + 28, H + 28);
+
+  // caption block
+  const capY = M + H + M * 0.4;
+  const title = (state.draft || '').split('\n').find(l => l.trim()) || 'untitled poem';
+  const modeName = state.mode === 'gematria'
+    ? `numogram (${state.numoLayout})`
+    : `${state.mode} constellation`;
+  const scaleFactor = W / 1280;
+
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#e8e2d3';
+  ctx.font = `italic 500 ${Math.round(30 * scaleFactor)}px "Cormorant Garamond", serif`;
+  ctx.fillText(title.slice(0, 70), M, capY);
+
+  ctx.fillStyle = '#8f897c';
+  ctx.font = `400 ${Math.round(14 * scaleFactor)}px "Inter", sans-serif`;
+  const meta = `${state.words.length} words · ${modeName} · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`.toUpperCase();
+  ctx.fillText(meta, M, capY + Math.round(44 * scaleFactor));
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#b39554';
+  ctx.font = `500 ${Math.round(13 * scaleFactor)}px "Inter", sans-serif`;
+  ctx.fillText('P O E T R Y   G R A P H', out.width - M, capY + Math.round(6 * scaleFactor));
+
+  out.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `poetry-graph-plate-${new Date().toISOString().slice(0, 10)}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+}
+
+function shareLink() {
+  const payload = {
+    mode: state.mode,
+    forceWeights: state.forceWeights,
+    numoLayout: state.numoLayout,
+    syllableAltitude: state.syllableAltitude,
+    customEdges: state.customEdges,
+    draft: (state.draft || '').slice(0, 4000),
+    words: state.words.map(({ text, rhymeKey, onsetKey, pos, syllables, stress, lineEnd }) =>
+      ({ text, rhymeKey, onsetKey, pos, syllables, stress, lineEnd })),
+  };
+  return `${location.origin}${location.pathname}#s=${encodeURIComponent(JSON.stringify(payload))}`;
+}
+
+function openExportPanel() {
+  panelMode = 'export';
+  selectedGroupKey = null;
+  panel.style.display = 'flex';
+  panelTitle.textContent = 'Export';
+  panelBody.innerHTML = `
+    <h3>Engraved plate</h3>
+    <p class="muted" style="font-style: normal; line-height: 1.6;">The current view, framed and captioned, as a PNG. Compose the shot first — orbit, zoom, mode.</p>
+    <button id="plateBtn" class="export-btn">download plate</button>
+    <h3>Share link</h3>
+    <p class="muted" style="font-style: normal; line-height: 1.6;">The whole poem — words, bonds, weights, draft — folded into a URL.</p>
+    <button id="shareBtn" class="export-btn">copy link</button>`;
+
+  panelBody.querySelector('#plateBtn').addEventListener('click', exportPlate);
+  panelBody.querySelector('#shareBtn').addEventListener('click', async e => {
+    try {
+      await navigator.clipboard.writeText(shareLink());
+      e.target.textContent = 'copied ✓';
+      setTimeout(() => { e.target.textContent = 'copy link'; }, 1600);
+    } catch (err) {
+      e.target.textContent = 'copy failed — see console';
+      console.log(shareLink());
+    }
+  });
+}
+
+// A share link restores the entire poem on arrival
+function initFromShare() {
+  if (!location.hash.startsWith('#s=')) return false;
+  try {
+    const payload = JSON.parse(decodeURIComponent(location.hash.slice(3)));
+    if (!Array.isArray(payload.words)) return false;
+    state.words = payload.words;
+    state.mode = ['alliteration', 'gematria'].includes(payload.mode) ? payload.mode : 'rhyme';
+    state.forceWeights = { ...state.forceWeights, ...(payload.forceWeights || {}) };
+    state.numoLayout = payload.numoLayout === 'spiral' ? 'spiral' : 'plate';
+    state.syllableAltitude = !!payload.syllableAltitude;
+    state.customEdges = Array.isArray(payload.customEdges) ? payload.customEdges : [];
+    state.draft = payload.draft || '';
+    state.form = null;
+    history.replaceState(null, '', location.pathname);
+    saveState();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ===== Toolbar =====
 document.querySelector('#panelClose').addEventListener('click', closePanel);
 document.querySelector('#addWordBtn').addEventListener('click', openAddPanel);
+document.querySelector('#exportBtn').addEventListener('click', openExportPanel);
 
 document.querySelectorAll('#modeToggle button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1729,6 +2028,7 @@ async function initFromSeed() {
 }
 
 loadState();
+initFromShare();
 // The serif renders into canvas sprites, so it must be loaded before first draw
 const fontsReady = Promise.all([
   document.fonts.load(`500 116px ${SERIF}`),

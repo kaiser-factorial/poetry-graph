@@ -300,6 +300,36 @@ async function fetchAlliterations(onset) {
   return words;
 }
 
+// CMU pronouncing dictionary: real stress patterns ("beautiful" -> "100")
+const { dictionary: cmuDict } = require('cmu-pronouncing-dictionary');
+
+function stressOf(word) {
+  const pron = cmuDict[word];
+  if (!pron) return null;
+  const digits = pron.match(/\d/g);
+  return digits ? digits.join('') : null;
+}
+
+// Semantic neighbors (Datamuse means-like)
+const similarCache = new Map();
+
+async function fetchSimilar(word) {
+  if (similarCache.has(word)) return similarCache.get(word);
+  let similar = [];
+  try {
+    const { data } = await axios.get(DATAMUSE, {
+      params: { ml: word, max: 30 },
+      timeout: 4000,
+    });
+    similar = data
+      .map(entry => entry.word)
+      .filter(w => CLEAN_WORD.test(w))
+      .slice(0, 18);
+  } catch (err) { /* no semantic neighbors offline */ }
+  similarCache.set(word, similar);
+  return similar;
+}
+
 // Part of speech + syllable count for a word (Datamuse md=ps, local fallback)
 const metaCache = new Map();
 const POS_TAGS = ['n', 'v', 'adj', 'adv'];
@@ -333,9 +363,17 @@ app.get('/api/word-info', async (req, res) => {
   const word = normalize(raw);
   const ending = getRhymeEnding(word);
   const onset = getOnset(word);
-  const [rhymes, meta] = await Promise.all([fetchRhymes(word), fetchWordMeta(word)]);
+  const stress = stressOf(word);
+  const [rhymes, meta, similar] = await Promise.all([
+    fetchRhymes(word), fetchWordMeta(word), fetchSimilar(word),
+  ]);
 
-  res.json({ word, ending, onset, rhymes, pos: meta.pos, syllables: meta.syllables });
+  res.json({
+    word, ending, onset, rhymes, similar, stress,
+    pos: meta.pos,
+    // CMU syllable count (stress length) beats the heuristics when available
+    syllables: stress ? stress.length : meta.syllables,
+  });
 });
 
 // Suggestions for an alliteration group

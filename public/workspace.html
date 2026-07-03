@@ -482,6 +482,32 @@
 
         .draft-gutter .aq-zone::before { content: '→'; margin-right: 1px; opacity: 0.6; }
 
+        .draft-gutter div.scan {
+            color: var(--muted);
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+        }
+
+        .draft-gutter div.scan.metered { color: var(--brass); }
+
+        #scansionBtn.on { color: var(--brass); border-color: rgba(179, 149, 84, 0.55); }
+
+        .export-btn {
+            width: 100%;
+            margin-bottom: 6px;
+            background: transparent;
+            border: 1px solid var(--hairline-strong);
+            color: var(--bone);
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            transition: all 0.2s ease;
+        }
+
+        .export-btn:hover { border-color: var(--brass); color: var(--brass); }
+
         .draft-body textarea {
             flex: 1;
             background: transparent;
@@ -694,6 +720,7 @@
             </div>
             <button class="button primary" id="addWordBtn">＋ Add Word</button>
             <button class="button" id="draftBtn">Draft</button>
+            <button class="button" id="exportBtn">Export</button>
             <button class="button" id="newPoemBtn">New Poem</button>
             <a href="read.html">Read</a>
             <a href="forms.html">Forms</a>
@@ -721,7 +748,7 @@
                 <button class="collapse-btn" data-collapse="forces">–</button>
             </div>
             <div id="forceRows"></div>
-            <div class="hint">Sliders set how strongly each relationship pulls words together. Drag words · scroll to zoom · right-drag to pan.</div>
+            <div class="hint">Sliders set how strongly each relationship pulls words together. Shift-click two words to bind them by hand. Drag words · scroll to zoom · right-drag to pan.</div>
         </div>
 
         <div class="draft" id="draft" style="display: none;">
@@ -729,6 +756,7 @@
                 <h3 id="draftTitle">Draft <span class="draft-note" id="draftNote">syllables count themselves</span></h3>
                 <div class="header-btns">
                     <button class="draft-mode-btn" id="formClearBtn" style="display: none;">free draft</button>
+                    <button class="draft-mode-btn" id="scansionBtn" title="toggle scansion marks (CMU stress)">˘´</button>
                     <button class="collapse-btn" data-collapse="draft">–</button>
                     <button class="panel-close" id="draftClose">✕</button>
                 </div>
@@ -754,6 +782,6 @@
         </div>
     </main>
 
-    <script type="module" src="workspace.js?v=14"></script>
+    <script type="module" src="workspace.js?v=15"></script>
 </body>
 </html>
