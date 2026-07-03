@@ -216,6 +216,7 @@ let state = {
   words: [], // { text, rhymeKey, onsetKey, pos: [], syllables }
   forceWeights: { rhyme: 0.6, alliteration: 0.6, pos: 0, syllables: 0, gematria: 0, meaning: 0.4, bond: 0.7, flow: 0 },
   customEdges: [], // hand-drawn word pairs (shift-click two words)
+  literalAlliteration: false, // alliteration links only between draft-adjacent words
   syllableAltitude: false, // words stratify vertically by syllable count
   numoLayout: 'plate', // numogram geometry: 'plate' (canonical) | 'spiral' (Barker)
   draft: '', // the poem-in-progress, written in the Draft drawer
@@ -241,6 +242,7 @@ function loadState() {
         state.syllableAltitude = !!parsed.syllableAltitude;
         state.numoLayout = parsed.numoLayout === 'spiral' ? 'spiral' : 'plate';
         state.customEdges = Array.isArray(parsed.customEdges) ? parsed.customEdges : [];
+        state.literalAlliteration = !!parsed.literalAlliteration;
         state.draft = parsed.draft || '';
         state.form = parsed.form || null;
         state.formSlots = parsed.formSlots || {};
@@ -383,6 +385,13 @@ function addCrossLinks(links) {
     if (typeName === 'syllables' && state.syllableAltitude) continue; // shown as altitude instead
     if (!(state.forceWeights[typeName] > 0)) continue;
 
+    if (typeName === 'alliteration' && state.literalAlliteration && state.draft) {
+      for (const [a, b] of literalAlliterationPairs()) {
+        links.push({ source: `w:${a}`, target: `w:${b}`, kind: typeName });
+      }
+      continue;
+    }
+
     if (type.pairs) {
       for (const [a, b] of type.pairs(state.words)) {
         links.push({ source: `w:${a}`, target: `w:${b}`, kind: typeName });
@@ -407,15 +416,19 @@ function addCrossLinks(links) {
   }
 }
 
-// Poem-order flow: consecutive words of the draft, traced as directed edges
-function flowPairs() {
-  if (!(state.forceWeights.flow > 0) || !state.draft) return [];
+// The draft's word order, filtered to words that live in the graph
+function draftWordSequence() {
+  if (!state.draft) return [];
   const have = new Set(state.words.map(w => w.text));
   const seq = [];
   for (const tok of (state.draft.toLowerCase().match(/[a-z']+/g) || [])) {
     const clean = tok.replace(/'/g, '');
     if (have.has(clean)) seq.push(clean);
   }
+  return seq;
+}
+
+function adjacentPairs(seq) {
   const seen = new Set();
   const pairs = [];
   for (let i = 0; i < seq.length - 1; i++) {
@@ -426,6 +439,21 @@ function flowPairs() {
     pairs.push([seq[i], seq[i + 1]]);
   }
   return pairs;
+}
+
+// Poem-order flow: consecutive words of the draft, traced as directed edges
+function flowPairs() {
+  if (!(state.forceWeights.flow > 0)) return [];
+  return adjacentPairs(draftWordSequence());
+}
+
+// Literal alliteration: onset-mates link only when they actually follow one
+// another in the poem (measured through mapped words, so "gold and
+// glimmering" still counts across the "and")
+function literalAlliterationPairs() {
+  const byText = new Map(state.words.map(w => [w.text, w]));
+  return adjacentPairs(draftWordSequence()).filter(([a, b]) =>
+    byText.get(a)?.onsetKey && byText.get(a).onsetKey === byText.get(b)?.onsetKey);
 }
 
 function addFlowLinks(links) {
@@ -1152,6 +1180,13 @@ function renderForcesPanel() {
           syllables as altitude
         </label>
       </div>
+      <div class="force-row ${state.draft ? '' : 'disabled'}" title="${state.draft ? 'alliterating words link only when they follow one another in the draft' : 'write in the Draft first — adjacency needs a poem'}">
+        <span class="swatch" style="background:${CONNECTION_TYPES.alliteration.color}; opacity:0.5"></span>
+        <label style="width:auto; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="literalAllitToggle" ${state.literalAlliteration ? 'checked' : ''} ${state.draft ? '' : 'disabled'}>
+          literal alliteration (adjacent only)
+        </label>
+      </div>
       <div class="force-row cam-row">
         <label>Camera</label>
         <div class="cam-btns">
@@ -1182,6 +1217,12 @@ function renderForcesPanel() {
     state.syllableAltitude = e.target.checked;
     saveState();
     applyAltitudeForce();
+    refreshGraph();
+  });
+
+  rows.querySelector('#literalAllitToggle')?.addEventListener('change', e => {
+    state.literalAlliteration = e.target.checked;
+    saveState();
     refreshGraph();
   });
 
@@ -1491,8 +1532,8 @@ draftText.addEventListener('input', () => {
   state.draft = draftText.value;
   saveState();
   updateDraftGutter();
-  // retrace poem flow as the draft changes
-  if (state.forceWeights.flow > 0) {
+  // retrace draft-derived edges (flow, literal alliteration) as it changes
+  if (state.forceWeights.flow > 0 || state.literalAlliteration) {
     clearTimeout(flowRefreshTimer);
     flowRefreshTimer = setTimeout(refreshGraph, 900);
   }
@@ -1911,6 +1952,7 @@ function shareLink() {
     numoLayout: state.numoLayout,
     syllableAltitude: state.syllableAltitude,
     customEdges: state.customEdges,
+    literalAlliteration: state.literalAlliteration,
     draft: (state.draft || '').slice(0, 4000),
     words: state.words.map(({ text, rhymeKey, onsetKey, pos, syllables, stress, lineEnd }) =>
       ({ text, rhymeKey, onsetKey, pos, syllables, stress, lineEnd })),
@@ -1956,6 +1998,7 @@ function initFromShare() {
     state.numoLayout = payload.numoLayout === 'spiral' ? 'spiral' : 'plate';
     state.syllableAltitude = !!payload.syllableAltitude;
     state.customEdges = Array.isArray(payload.customEdges) ? payload.customEdges : [];
+    state.literalAlliteration = !!payload.literalAlliteration;
     state.draft = payload.draft || '';
     state.form = null;
     history.replaceState(null, '', location.pathname);
