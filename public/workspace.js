@@ -421,7 +421,7 @@ function draftWordSequence() {
   if (!state.draft) return [];
   const have = new Set(state.words.map(w => w.text));
   const seq = [];
-  for (const tok of (state.draft.toLowerCase().match(/[a-z']+/g) || [])) {
+  for (const tok of (state.draft.replace(/[\u2019\u2018]/g, "'").toLowerCase().match(/[a-z']+/g) || [])) {
     const clean = tok.replace(/'/g, '');
     if (have.has(clean)) seq.push(clean);
   }
@@ -1428,7 +1428,7 @@ const draftText = document.querySelector('#draftText');
 const draftGutter = document.querySelector('#draftGutter');
 
 function lineSyllables(line) {
-  const tokens = line.toLowerCase().match(/[a-z']+/g) || [];
+  const tokens = line.replace(/[\u2019\u2018]/g, "'").toLowerCase().match(/[a-z']+/g) || [];
   if (!tokens.length) return '';
   const known = new Map(state.words.map(w => [w.text, w.syllables]));
   return tokens.reduce((sum, t) => {
@@ -1438,7 +1438,7 @@ function lineSyllables(line) {
 }
 
 function lineAq(line) {
-  const tokens = line.toLowerCase().match(/[a-z0-9']+/g) || [];
+  const tokens = line.replace(/[\u2019\u2018]/g, "'").toLowerCase().match(/[a-z0-9']+/g) || [];
   if (!tokens.length) return null;
   return tokens.reduce((sum, t) => sum + aqValue(t.replace(/'/g, '')), 0);
 }
@@ -1454,7 +1454,7 @@ function stressOfToken(t) {
 }
 
 function lineScansion(line) {
-  const tokens = (line.toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''));
+  const tokens = (line.replace(/[\u2019\u2018]/g, "'").toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''));
   if (!tokens.length) return { marks: '', binary: '', complete: false };
   let marks = [];
   let binary = '';
@@ -1510,7 +1510,7 @@ function updateDraftGutter() {
     const allTokens = [];
     draftGutter.innerHTML = lines.map(line => {
       const { marks, binary, complete } = lineScansion(line);
-      allTokens.push(...((line.toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''))));
+      allTokens.push(...((line.replace(/[\u2019\u2018]/g, "'").toLowerCase().match(/[a-z']+/g) || []).map(t => t.replace(/'/g, ''))));
       const meter = complete && binary ? meterName(binary) : null;
       const syl = lineSyllables(line);
       return `<div class="scan ${meter ? 'metered' : ''}" title="${meter || (syl !== '' ? syl + ' syllables' : '')}">${marks}</div>`;

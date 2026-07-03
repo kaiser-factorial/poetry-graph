@@ -326,10 +326,10 @@ Nothing gold can stay.`;
             // Tokenize, drop function words, remember line-enders
             const candidates = new Map(); // text -> { lineEnd }
             let skipped = 0;
-            for (const line of text.split('\n')) {
+            for (const line of text.replace(/[\u2019\u2018]/g, "'").split('\n')) {
                 const tokens = (line.toLowerCase().match(/[a-z']+/g) || [])
-                    .map(t => t.replace(/'/g, ''))
-                    .filter(Boolean);
+                    .map(t => t.replace(/n't$|'(m|s|d|ll|ve|re)$/, '').replace(/'/g, ''))
+                    .filter(t => t.length > 1); // i'm -> i (stopword), she'd -> she, don't -> do
                 tokens.forEach((t, i) => {
                     if (STOPWORDS.has(t)) { skipped++; return; }
                     if (!candidates.has(t)) candidates.set(t, { lineEnd: false });
