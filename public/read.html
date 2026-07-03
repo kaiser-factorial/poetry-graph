@@ -256,11 +256,14 @@
     <script>
         const API_URL = 'http://localhost:3001';
 
+        // Function words only — pronouns and interrogatives stay mappable
+        // (they're big rhymers: you/true, me/see, who/askew). The loner-cut
+        // removes any that don't actually find a partner in the poem.
         const STOPWORDS = new Set(('the a an and or but of to in on at by for with from as is are was were be been am ' +
-            'it its this that these those i you he she we they him her them my your his our their me us so if then than ' +
-            'too not no nor do does did has have had will shall would should can could may might must there here when ' +
-            'where while what who whom how why o oh into upon out up down all each both more most some any through till ' +
-            'until again also just yet ere thee thou thy ye doth dost hath oer neath tis twas').split(' '));
+            'it its this that these those so if then than ' +
+            'too not no nor do does did has have had will shall would should can could may might must there here ' +
+            'while o oh into upon out up down all each both more most some any through till ' +
+            'until again also just yet ere doth dost hath oer neath tis twas').split(' '));
 
         const VOWELS = 'aeiouy';
         const SILENT_STARTS = { kn: 'n', gn: 'n', wr: 'r', ps: 's', pn: 'n', mn: 'n' };
@@ -329,7 +332,7 @@ Nothing gold can stay.`;
             for (const line of text.replace(/[\u2019\u2018]/g, "'").split('\n')) {
                 const tokens = (line.toLowerCase().match(/[a-z']+/g) || [])
                     .map(t => t.replace(/n't$|'(m|s|d|ll|ve|re)$/, '').replace(/'/g, ''))
-                    .filter(t => t.length > 1); // i'm -> i (stopword), she'd -> she, don't -> do
+                    .filter(t => t.length > 1 || t === 'i'); // drop shrapnel, but 'I' is a word (and a rhymer)
                 tokens.forEach((t, i) => {
                     if (STOPWORDS.has(t)) { skipped++; return; }
                     if (!candidates.has(t)) candidates.set(t, { lineEnd: false });
@@ -342,12 +345,22 @@ Nothing gold can stay.`;
                 [...candidates.keys()].map(async t => ({ text: t, ...await wordInfo(t), lineEnd: candidates.get(t).lineEnd }))
             );
 
-            // Sound-true rhyme grouping (same logic as the workspace)
+            // Sound-true rhyme grouping (same logic as the workspace).
+            // Words join a family if either names the other, OR their rhyme
+            // lists overlap — robust when truncated lists omit each other
+            // (who/you both list new, true, blue…).
+            const overlaps = (a, b) => {
+                const setB = new Set(b);
+                let n = 0;
+                for (const w of a) if (setB.has(w) && ++n >= 2) return true;
+                return false;
+            };
             const groups = []; // { key, members: [info] }
             for (const info of infos) {
                 const rhymeSet = new Set(info.rhymes || []);
                 let group = groups.find(g =>
-                    g.members.some(m => rhymeSet.has(m.text) || (m.rhymes || []).includes(info.text)));
+                    g.members.some(m => rhymeSet.has(m.text) || (m.rhymes || []).includes(info.text) ||
+                        overlaps(info.rhymes || [], m.rhymes || [])));
                 if (!group) {
                     let key = info.ending;
                     let n = 2;

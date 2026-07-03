@@ -866,7 +866,8 @@ async function fetchWordInfo(text) {
 
 // True-rhyme grouping: spelling endings differ ("tone" / "known"), so a word
 // joins an existing group whenever it genuinely rhymes with a member —
-// checked against the new word's rhyme list and each group's cached one.
+// checked against the new word's rhyme list, each group's cached one, and
+// (robust to truncated lists) whether the two rhyme lists overlap.
 function findRhymeGroup(clean, info) {
   const rhymeSet = new Set(info.rhymes || []);
   const groups = new Map();
@@ -877,7 +878,13 @@ function findRhymeGroup(clean, info) {
   for (const [key, members] of groups) {
     if (members.some(m => rhymeSet.has(m))) return key;
     const cached = suggestionCache.get(`rhyme:${key}`);
-    if (cached && cached.includes(clean)) return key;
+    if (cached) {
+      if (cached.includes(clean)) return key;
+      let shared = 0;
+      for (const w of info.rhymes || []) {
+        if (cached.includes(w) && ++shared >= 2) return key;
+      }
+    }
   }
   return null;
 }
@@ -2208,19 +2215,67 @@ function camFollowLoop() {
 }
 
 // The word of the moment flares verdigris — nothing else in the scene is
-// teal, so the eye finds it instantly among the bone and brass.
+// teal, so the eye finds it instantly among the bone and brass. A soft
+// halo separates it from the background, and depth-testing is suspended
+// so no edge or node can pass in front of it while it speaks.
 const PERFORM_COLOR = '#9fe0cf';
+let glowTexture = null;
+
+function makeGlowSprite() {
+  if (!glowTexture) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    g.addColorStop(0, 'rgba(159,224,207,0.8)');
+    g.addColorStop(0.35, 'rgba(159,224,207,0.22)');
+    g.addColorStop(1, 'rgba(159,224,207,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    glowTexture = new THREE.CanvasTexture(c);
+  }
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture, transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, depthTest: false, opacity: 0.95,
+  }));
+  sprite.scale.setScalar(36);
+  sprite.renderOrder = 996;
+  return sprite;
+}
 
 function pulseWord(node) {
-  setWordLabelColor(node, PERFORM_COLOR);
-  const dot = node.__threeObj?.children.find(c => c.isMesh);
-  if (dot) dot.material.color.set(PERFORM_COLOR);
-  node.__threeObj?.scale.setScalar(1.4);
+  const obj = node.__threeObj;
+  if (!obj) return;
+  const label = obj.children.find(c => c instanceof SpriteText);
+  const dot = obj.children.find(c => c.isMesh);
+  const glow = makeGlowSprite();
+  obj.add(glow);
+
+  if (label) {
+    label.color = PERFORM_COLOR;
+    label.material.depthTest = false;
+    label.renderOrder = 999;
+  }
+  if (dot) {
+    dot.material.color.set(PERFORM_COLOR);
+    dot.material.depthTest = false;
+    dot.renderOrder = 998;
+  }
+  obj.scale.setScalar(1.4);
+
   setTimeout(() => {
-    node.__threeObj?.scale.setScalar(1);
-    setWordLabelColor(node, wordLabelColor(node.word));
-    const d = node.__threeObj?.children.find(c => c.isMesh);
-    if (d) d.material.color.set(POS_TINTS[node.word.pos?.[0]] ?? 0x9b9588);
+    obj.scale.setScalar(1);
+    obj.remove(glow);
+    if (label) {
+      label.color = wordLabelColor(node.word);
+      label.material.depthTest = true;
+      label.renderOrder = 0;
+    }
+    if (dot) {
+      dot.material.color.set(POS_TINTS[node.word.pos?.[0]] ?? 0x9b9588);
+      dot.material.depthTest = true;
+      dot.renderOrder = 0;
+    }
   }, 780);
 }
 
@@ -2261,6 +2316,7 @@ async function startPerformance() {
   ui.camLock = 'free';
   applyCamLock();
   camFollowLoop();
+  Graph.linkOpacity(0.16); // the web recedes while the poem speaks
 
   if (draftEl.style.display === 'none') openDraft();
 
@@ -2307,6 +2363,7 @@ function stopPerformance() {
   btn.textContent = 'Perform';
   btn.classList.remove('on');
   draftGutter.querySelectorAll('.playing').forEach(d => d.classList.remove('playing'));
+  Graph.linkOpacity(0.55);
 
   if (savedCamLock !== null) {
     ui.camLock = savedCamLock;
