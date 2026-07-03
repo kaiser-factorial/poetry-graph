@@ -121,16 +121,25 @@ const ZONE_REGION = {
 };
 const REGION_DEPTH = { torque: 0, warp: 160, plex: -160 };
 
-// Barker spiral layout: each syzygy is one turn of an expanding helix —
-// 4::5 innermost, 0::9 outermost — twins diametrically opposed on their loop.
-const SPIRAL_PAIR_INDEX = { 4: 0, 5: 0, 3: 1, 6: 1, 2: 2, 7: 2, 1: 3, 8: 3, 0: 4, 9: 4 };
+// Barker spiral layout: one continuous helix from the innermost syzygy to
+// the outermost — zones sit exactly on the curve at golden-angle intervals,
+// 4::5 at the core, 0::9 on the widest, highest turn.
+const SPIRAL_ORDER = [4, 5, 3, 6, 2, 7, 1, 8, 0, 9];
+const SPIRAL_STEP = 2.39996; // golden angle
+
+function spiralParam(k) {
+  const theta = k * SPIRAL_STEP;
+  const r = 40 + k * 30;
+  const y = (k - 4.5) * 36;
+  return [Math.cos(theta) * r, y, Math.sin(theta) * r];
+}
 
 function spiralZonePos(z) {
-  const i = SPIRAL_PAIR_INDEX[z];
-  const isLowerTwin = z === [4, 3, 2, 1, 0][i];
-  const r = 40 + i * 46;
-  const angle = i * 1.05 + (isLowerTwin ? 0 : Math.PI);
-  return [Math.cos(angle) * r, (i - 2) * 62, Math.sin(angle) * r];
+  return spiralParam(SPIRAL_ORDER.indexOf(z));
+}
+
+function numoScale() {
+  return 0.55 + Math.min(state.words.length * 0.015, 0.35);
 }
 const ZONE_LORE = {
   0: { planet: 'Sol', region: 'plex', particle: 'eiaoung', line: 'Dense void of the cosmic hypermatrix — flatline and loss of signal.' },
@@ -257,7 +266,7 @@ function buildGraphData() {
   // Numogram mode: all ten zones render as pinned anchors in the canonical
   // geometry — the poem populates the diagram rather than shaping it.
   if (state.mode === 'gematria') {
-    const scale = 0.55 + Math.min(state.words.length * 0.015, 0.35);
+    const scale = numoScale();
     for (let z = 0; z <= 9; z++) {
       const key = String(z);
       const id = `hub:gematria:${key}`;
@@ -573,6 +582,32 @@ function updateStrataGuides() {
 // Re-measure the rings once the layout settles
 Graph.onEngineStop(() => { if (state.syllableAltitude) updateStrataGuides(); });
 
+// The continuous Barker spiral, etched as a dashed hairline through the zones
+const spiralGroup = new THREE.Group();
+scene.add(spiralGroup);
+
+function updateSpiralGuide() {
+  spiralGroup.clear();
+  if (state.mode !== 'gematria' || state.numoLayout !== 'spiral') return;
+
+  const scale = numoScale() * 1.6;
+  const points = [];
+  for (let i = 0; i <= 300; i++) {
+    const k = -0.45 + (i / 300) * 10.35; // overshoot both ends a little
+    const [x, y, z] = spiralParam(k);
+    points.push(new THREE.Vector3(x * scale, y * scale, z * scale));
+  }
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineDashedMaterial({
+      color: 0xe8e2d3, transparent: true, opacity: 0.22,
+      dashSize: 4.5, gapSize: 3.5,
+    })
+  );
+  line.computeLineDistances();
+  spiralGroup.add(line);
+}
+
 // ===== Etched-atlas rendering =====
 // Hubs are engraved circles (always facing the viewer, like a chart symbol);
 // words are the typography itself, anchored by a small point.
@@ -705,6 +740,7 @@ function refreshGraph() {
   // graphData() reheats the simulation itself when the data changes
   Graph.graphData(buildGraphData());
   updateStrataGuides();
+  updateSpiralGuide();
   renderForcesPanel();
 }
 
