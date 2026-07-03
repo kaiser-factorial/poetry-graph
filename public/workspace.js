@@ -1187,6 +1187,15 @@ function renderForcesPanel() {
           literal alliteration (adjacent only)
         </label>
       </div>
+      <div class="force-row cam-row" title="key and scale for the Perform ritual — zones become scale degrees">
+        <label>Music</label>
+        <div class="cam-btns">
+          <select id="musicKeySel">${Object.keys(KEYS).map(k =>
+            `<option value="${k}" ${ui.musicKey === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
+          <select id="musicScaleSel">${Object.entries(SCALES).map(([id, s]) =>
+            `<option value="${id}" ${ui.musicScale === id ? 'selected' : ''}>${s.label}</option>`).join('')}</select>
+        </div>
+      </div>
       <div class="force-row cam-row">
         <label>Camera</label>
         <div class="cam-btns">
@@ -1224,6 +1233,15 @@ function renderForcesPanel() {
     state.literalAlliteration = e.target.checked;
     saveState();
     refreshGraph();
+  });
+
+  rows.querySelector('#musicKeySel')?.addEventListener('change', e => {
+    ui.musicKey = e.target.value;
+    saveUi();
+  });
+  rows.querySelector('#musicScaleSel')?.addEventListener('change', e => {
+    ui.musicScale = e.target.value;
+    saveUi();
   });
 
   rows.querySelectorAll('[data-cam]').forEach(btn => {
@@ -1752,8 +1770,12 @@ try {
     size: savedUi.size || {},
     camLock: ['turntable', 'tilt'].includes(savedUi.camLock) ? savedUi.camLock : 'free',
     scansion: !!savedUi.scansion,
+    musicKey: savedUi.musicKey || 'A',
+    musicScale: savedUi.musicScale || 'pentatonic',
   };
 } catch (e) { /* defaults */ }
+ui.musicKey = ui.musicKey || 'A';
+ui.musicScale = ui.musicScale || 'pentatonic';
 
 function saveUi() {
   localStorage.setItem(UI_KEY, JSON.stringify(ui));
@@ -1786,28 +1808,6 @@ function setupFloatingPanel(name, el) {
     placePanel(el, p.x, p.y);
   }
 
-  // dragging
-  handle.addEventListener('pointerdown', e => {
-    if (e.target.closest('button, input, a, textarea, select')) return;
-    const m = mainEl.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    const offX = e.clientX - r.left;
-    const offY = e.clientY - r.top;
-    const move = ev => {
-      const p = clampToMain(ev.clientX - m.left - offX, ev.clientY - m.top - offY, el);
-      placePanel(el, p.x, p.y);
-      ui.pos[name] = p;
-    };
-    const up = () => {
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-      saveUi();
-    };
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-    e.preventDefault();
-  });
-
   // collapsing
   const btn = el.querySelector('.collapse-btn');
   const applyCollapse = () => {
@@ -1815,13 +1815,42 @@ function setupFloatingPanel(name, el) {
     btn.textContent = ui.collapsed[name] ? '＋' : '–';
     btn.title = ui.collapsed[name] ? 'expand' : 'collapse';
   };
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
+  const toggleCollapse = () => {
     ui.collapsed[name] = !ui.collapsed[name];
     saveUi();
     applyCollapse();
+  };
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleCollapse();
   });
   applyCollapse();
+
+  // dragging — a click that never travels toggles collapse instead
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('button, input, a, textarea, select')) return;
+    const m = mainEl.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const offX = e.clientX - r.left;
+    const offY = e.clientY - r.top;
+    let moved = false;
+    const move = ev => {
+      if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 5) return;
+      moved = true;
+      const p = clampToMain(ev.clientX - m.left - offX, ev.clientY - m.top - offY, el);
+      placePanel(el, p.x, p.y);
+      ui.pos[name] = p;
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      if (moved) saveUi();
+      else toggleCollapse();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
 
   // resizing (corner grip)
   const grip = document.createElement('div');
@@ -2019,36 +2048,69 @@ let audioCtx = null;
 let droneGain = null;
 let savedCamLock = null;
 
-const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // zone 0–9 → semitones above A3
+// Zones 0–9 climb the chosen scale, wrapping up an octave each cycle
+const SCALES = {
+  'pentatonic': { label: 'penta major', semis: [0, 2, 4, 7, 9] },
+  'penta-minor': { label: 'penta minor', semis: [0, 3, 5, 7, 10] },
+  'hirajoshi': { label: 'hirajōshi', semis: [0, 2, 3, 7, 8] },
+  'dorian': { label: 'dorian', semis: [0, 2, 3, 5, 7, 9, 10] },
+  'harmonic': { label: 'harmonic minor', semis: [0, 2, 3, 5, 7, 8, 11] },
+  'whole': { label: 'whole-tone', semis: [0, 2, 4, 6, 8, 10] },
+};
+const KEYS = { 'A': 0, 'B♭': 1, 'B': 2, 'C': 3, 'D♭': 4, 'D': 5, 'E♭': 6, 'E': 7, 'F': 8, 'G♭': 9, 'G': 10, 'A♭': 11 };
 
-function toneFor(text) {
-  return 220 * Math.pow(2, PENTATONIC[digitalRoot(aqValue(text))] / 12);
+function musicScale() {
+  return SCALES[ui.musicScale] || SCALES.pentatonic;
 }
 
-function playTone(freq) {
+function musicKeyOffset() {
+  return KEYS[ui.musicKey] ?? 0;
+}
+
+function toneFor(text) {
+  const degree = digitalRoot(aqValue(text));
+  const { semis } = musicScale();
+  const semi = semis[degree % semis.length] + 12 * Math.floor(degree / semis.length);
+  return 220 * Math.pow(2, (musicKeyOffset() + semi) / 12);
+}
+
+// One pulse per syllable: stressed syllables ring, unstressed ones murmur
+const SYL_MS = 230;
+
+function playPulse(freq, offsetSec, amp) {
   if (!audioCtx) return;
-  const t = audioCtx.currentTime;
+  const t = audioCtx.currentTime + offsetSec;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = 'sine';
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(0.13, t + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+  gain.gain.linearRampToValueAtTime(amp, t + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
   osc.connect(gain).connect(audioCtx.destination);
   osc.start(t);
-  osc.stop(t + 0.8);
+  osc.stop(t + 0.46);
   // a faint octave above, for shimmer
   const osc2 = audioCtx.createOscillator();
   const gain2 = audioCtx.createGain();
   osc2.type = 'triangle';
   osc2.frequency.value = freq * 2;
   gain2.gain.setValueAtTime(0, t);
-  gain2.gain.linearRampToValueAtTime(0.03, t + 0.04);
-  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+  gain2.gain.linearRampToValueAtTime(amp * 0.22, t + 0.03);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
   osc2.connect(gain2).connect(audioCtx.destination);
   osc2.start(t);
-  osc2.stop(t + 0.65);
+  osc2.stop(t + 0.36);
+}
+
+// The meter is the dynamics: 1/2 = stressed (loud), 0 = unstressed (soft)
+function playWord(text, stress, syllables) {
+  const freq = toneFor(text);
+  for (let k = 0; k < syllables; k++) {
+    const digit = stress ? stress[k] : null;
+    const amp = digit === '0' ? 0.05 : digit ? 0.17 : 0.1;
+    playPulse(freq, (k * SYL_MS) / 1000, amp);
+  }
 }
 
 function startDrone() {
@@ -2057,7 +2119,8 @@ function startDrone() {
   droneGain.gain.setValueAtTime(0, t);
   droneGain.gain.linearRampToValueAtTime(0.032, t + 1.5);
   droneGain.connect(audioCtx.destination);
-  for (const f of [110, 164.8]) { // root + fifth
+  const root = 110 * Math.pow(2, musicKeyOffset() / 12);
+  for (const f of [root, root * 1.4983]) { // root + fifth, in the chosen key
     const osc = audioCtx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = f;
@@ -2076,7 +2139,9 @@ function stopDrone() {
   droneGain = null;
 }
 
-// Every mapped word of the draft, in order, with its line number
+// Every word of the draft — mapped or not — in order, with its line number.
+// Unmapped words still sound (their AQ is computable); only mapped words
+// draw the camera. Function words become the patter between the beats.
 function performanceSequence() {
   const have = new Set(state.words.map(w => w.text));
   const seq = [];
@@ -2084,7 +2149,7 @@ function performanceSequence() {
   lines.forEach((line, li) => {
     for (const tok of (line.match(/[a-z']+/g) || [])) {
       const clean = tok.replace(/'/g, '');
-      if (have.has(clean)) seq.push({ text: clean, line: li });
+      if (clean) seq.push({ text: clean, line: li, mapped: have.has(clean) });
     }
   });
   return seq;
@@ -2128,8 +2193,17 @@ async function startPerformance() {
   }
   performing = true;
   const btn = document.querySelector('#performBtn');
-  btn.textContent = 'Stop';
+  btn.textContent = 'Tuning…';
   btn.classList.add('on');
+
+  // every word needs its stress pattern before the ritual begins
+  const unknown = [...new Set(seq.map(s => s.text))].filter(t => stressOfToken(t) === undefined);
+  await Promise.all(unknown.map(async t => {
+    const info = await fetchWordInfo(t);
+    stressCache.set(t, info.stress ?? null);
+  }));
+  if (!performing) return; // stopped during tuning
+  btn.textContent = 'Stop';
 
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -2141,19 +2215,33 @@ async function startPerformance() {
 
   if (draftEl.style.display === 'none') openDraft();
 
+  const GAP_MS = 100;
+  const LINE_PAUSE_MS = 380;
+  const BLANK_LINE_MS = 420;
+
   let i = 0;
   const step = () => {
     if (!performing || i >= seq.length) { stopPerformance(); return; }
-    const { text, line } = seq[i];
-    const node = nodeCache.get(`w:${text}`);
-    highlightPerformLine(line);
+    const cur = seq[i];
+    const stress = stressOfToken(cur.text);
+    const syllables = stress ? stress.length : localSyllables(cur.text);
+
+    highlightPerformLine(cur.line);
+    const node = cur.mapped ? nodeCache.get(`w:${cur.text}`) : null;
     if (node) {
       flyToNode(node);
       pulseWord(node);
     }
-    playTone(toneFor(text));
+    playWord(cur.text, stress, syllables);
+
+    // the word takes as long as its syllables; lines and stanzas breathe
+    let delay = syllables * SYL_MS + GAP_MS;
+    const next = seq[i + 1];
+    if (next && next.line > cur.line) {
+      delay += LINE_PAUSE_MS + (next.line - cur.line - 1) * BLANK_LINE_MS;
+    }
     i++;
-    performTimer = setTimeout(step, 950);
+    performTimer = setTimeout(step, delay);
   };
   step();
 }
