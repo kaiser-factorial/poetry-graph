@@ -7,11 +7,8 @@ Words enter as points; their relationships become forces. Rhyme families gather 
 ## Running it
 
 ```bash
-# terminal 1 — API (rhymes, phonetics, semantics, stress)
-cd backend && npm install && npm start        # http://localhost:3001
-
-# terminal 2 — frontend (static, cache disabled)
-npx http-server public -p 3000 -c-1           # http://localhost:3000
+npm install   # once — also installs backend deps
+npm start     # API on :3001 + frontend on :3000, together
 ```
 
 Then open [http://localhost:3000/workspace.html](http://localhost:3000/workspace.html). An internet connection makes everything richer (Datamuse supplies rhymes, meanings, and parts of speech); offline, spelling-based fallbacks take over.

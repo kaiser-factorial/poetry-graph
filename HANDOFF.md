@@ -96,5 +96,5 @@ public/                  static, served with http-server -c-1 on :3000
 
 ## Housekeeping candidates
 - Retire or rebuild the explorer; then `backend/embeddings.js`, `forceLayout.js`, `poemGenerator.js` and half of `server.js` can go.
-- Root `package.json` is mostly vestigial (d3 devDep unused since the workspace went 3D); a `concurrently` start script for both servers would be kind.
+- ~~Root `package.json` is mostly vestigial; a `concurrently` start script would be kind.~~ Done: `npm start` runs both servers (concurrently + http-server as devDeps, postinstall covers backend); unused d3 devDep removed.
 - `rhyme.js`'s hand lists are only used as offline fallback; superseded if the CMU-rhyme idea lands.

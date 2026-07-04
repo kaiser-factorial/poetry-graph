@@ -1,16 +1,15 @@
 {
   "name": "poetry_graph",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "An instrument for seeing, building, and performing the sound-structure of poems",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently -n api,web -c yellow,cyan \"node backend/server.js\" \"http-server public -p 3000 -c-1 --silent\"",
+    "postinstall": "cd backend && npm install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "d3": "^7.9.0"
+    "concurrently": "^9.1.0",
+    "http-server": "^14.1.1"
   }
 }
