@@ -254,7 +254,9 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:3001';
+        const API_URL = location.hostname === 'localhost' && location.port && location.port !== '3001'
+            ? 'http://localhost:3001'
+            : '';
 
         // Function words only — pronouns and interrogatives stay mappable
         // (they're big rhymers: you/true, me/see, who/askew). The loner-cut

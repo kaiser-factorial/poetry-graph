@@ -13,6 +13,12 @@ npm start     # API on :3001 + frontend on :3000, together
 
 Then open [http://localhost:3000/workspace.html](http://localhost:3000/workspace.html). An internet connection makes everything richer (Datamuse supplies rhymes, meanings, and parts of speech); offline, spelling-based fallbacks take over.
 
+## Deploying it
+
+This repo is prepared for Vercel. Import it as a plain Node/static project and keep the default install command (`npm install`). No build command is required. Vercel serves `public/` as the static site, rewrites `/` to `workspace.html`, and sends `/api/*` requests to the Express app through `api/index.js`.
+
+The frontend uses same-origin API calls in production, while local development still points the `:3000` static server at the API on `:3001`.
+
 ## The pages
 
 ### ✍️ Workspace (`workspace.html`) — the centerpiece

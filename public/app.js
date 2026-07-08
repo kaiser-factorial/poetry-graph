@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:3001';
+const API_URL = location.hostname === 'localhost' && location.port && location.port !== '3001'
+  ? 'http://localhost:3001'
+  : '';
 
 let graphData = null;
 let selectedWord = null;

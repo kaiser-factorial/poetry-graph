@@ -39,7 +39,7 @@ app.post('/api/graph', (req, res) => {
 });
 
 function buildPoetryGraph(words) {
-  const uniqueWords = [...new Set(words.map(w => w.toLowerCase()))].slice(0, 60);
+  const uniqueWords = [...new Set(words.map(normalize).filter(Boolean))].slice(0, 60);
 
   const graph = new ForceDirectedGraph(uniqueWords, {
     width: 800,
@@ -390,6 +390,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Poetry Graph API running on http://localhost:${PORT}`);
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Poetry Graph API running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

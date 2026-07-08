@@ -8,7 +8,9 @@ import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
 import { forceY, forceCollide } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = location.hostname === 'localhost' && location.port && location.port !== '3001'
+  ? 'http://localhost:3001'
+  : '';
 const STORAGE_KEY = 'poetry-workspace-v2';
 
 // ===== Client-side phonetics (mirrors backend/phonetics.js, used as fallback) =====
@@ -230,6 +232,52 @@ let panelMode = 'closed';
 const suggestionCache = new Map();
 const nodeCache = new Map(); // id -> node object (keeps x/y/z across rebuilds)
 
+function sanitizeWordRecord(record) {
+  const text = normalizeWord(record?.text);
+  if (!text) return null;
+  const pos = Array.isArray(record.pos)
+    ? record.pos.filter(tag => Object.prototype.hasOwnProperty.call(POS_NAMES, tag)).slice(0, 4)
+    : [];
+  const similar = Array.isArray(record.similar)
+    ? [...new Set(record.similar.map(normalizeWord).filter(Boolean))].slice(0, 18)
+    : [];
+  const syllables = Number.isFinite(Number(record.syllables))
+    ? Math.max(1, Math.min(20, Math.round(Number(record.syllables))))
+    : localSyllables(text);
+  const stress = typeof record.stress === 'string' && /^[012]+$/.test(record.stress)
+    ? record.stress
+    : null;
+  return {
+    text,
+    rhymeKey: normalizeWord(record.rhymeKey) || localRhymeEnding(text),
+    onsetKey: normalizeWord(record.onsetKey) || localOnset(text),
+    pos,
+    syllables,
+    stress,
+    similar,
+    lineEnd: !!record.lineEnd,
+  };
+}
+
+function sanitizeWords(words) {
+  const seen = new Set();
+  const clean = [];
+  for (const record of Array.isArray(words) ? words : []) {
+    const word = sanitizeWordRecord(record);
+    if (!word || seen.has(word.text)) continue;
+    seen.add(word.text);
+    clean.push(word);
+  }
+  return clean;
+}
+
+function sanitizeCustomEdges(edges, words) {
+  const have = new Set(words.map(w => w.text));
+  return (Array.isArray(edges) ? edges : [])
+    .map(edge => Array.isArray(edge) ? edge.map(normalizeWord).slice(0, 2) : [])
+    .filter(([a, b]) => a && b && a !== b && have.has(a) && have.has(b));
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('poetry-workspace-v1');
@@ -237,11 +285,11 @@ function loadState() {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.words)) {
         state.mode = ['alliteration', 'gematria'].includes(parsed.mode) ? parsed.mode : 'rhyme';
-        state.words = parsed.words;
+        state.words = sanitizeWords(parsed.words);
         if (parsed.forceWeights) state.forceWeights = { ...state.forceWeights, ...parsed.forceWeights };
         state.syllableAltitude = !!parsed.syllableAltitude;
         state.numoLayout = parsed.numoLayout === 'spiral' ? 'spiral' : 'plate';
-        state.customEdges = Array.isArray(parsed.customEdges) ? parsed.customEdges : [];
+        state.customEdges = sanitizeCustomEdges(parsed.customEdges, state.words);
         state.literalAlliteration = !!parsed.literalAlliteration;
         state.draft = parsed.draft || '';
         state.form = parsed.form || null;
@@ -2036,12 +2084,12 @@ function initFromShare() {
   try {
     const payload = JSON.parse(decodeURIComponent(location.hash.slice(3)));
     if (!Array.isArray(payload.words)) return false;
-    state.words = payload.words;
+    state.words = sanitizeWords(payload.words);
     state.mode = ['alliteration', 'gematria'].includes(payload.mode) ? payload.mode : 'rhyme';
     state.forceWeights = { ...state.forceWeights, ...(payload.forceWeights || {}) };
     state.numoLayout = payload.numoLayout === 'spiral' ? 'spiral' : 'plate';
     state.syllableAltitude = !!payload.syllableAltitude;
-    state.customEdges = Array.isArray(payload.customEdges) ? payload.customEdges : [];
+    state.customEdges = sanitizeCustomEdges(payload.customEdges, state.words);
     state.literalAlliteration = !!payload.literalAlliteration;
     state.draft = payload.draft || '';
     state.form = null;

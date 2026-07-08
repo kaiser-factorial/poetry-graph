@@ -27,14 +27,18 @@ backend/                 Express on :3001 (run: node server.js)
   server.js              all endpoints; in-memory caches (cleared on restart)
   phonetics.js           rhyme endings, onsets, syllable heuristic
   rhyme.js, embeddings.js, forceLayout.js, poemGenerator.js   ← v1, explorer-only
+api/index.js             Vercel function entrypoint exporting the Express app
 public/                  static, served with http-server -c-1 on :3000
   workspace.html/.js     THE app (~2200 lines JS; ES module via esm.sh import map)
   read.html              self-contained analyzer (inline script)
   forms.html             static field guide
   index.html + app.js    legacy explorer (v1 API)
+vercel.json              rewrites /api/* to the function and / to workspace.html
 ```
 
 **Key endpoints**: `/api/word-info?word=` (ending, onset, rhymes, similar, pos, syllables, stress), `/api/alliterations?onset=`, plus v1 endpoints the explorer uses.
+
+**Deployment**: The repo is Vercel-ready as a plain Node/static project. Leave the build command empty/default; `npm install` runs the root `postinstall`, which installs `backend/` dependencies including the CMU pronouncing dictionary used for stress/scansion. Frontend API URLs are same-origin in production and still use `http://localhost:3001` when served from local `:3000`.
 
 **Workspace state** (`localStorage: poetry-workspace-v2`): `{ mode, words[{text, rhymeKey, onsetKey, pos, syllables, stress, similar, lineEnd?}], forceWeights, customEdges, literalAlliteration, syllableAltitude, numoLayout, draft, form, formSlots, formBodies }`. UI state (`poetry-workspace-ui-v1`): panel pos/size/collapse, camLock, scansion. Share links: `#s=<urlencoded JSON>` (trimmed: no `similar`), consumed and stripped on load.
 
