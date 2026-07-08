@@ -5,7 +5,7 @@
 
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1?external=three';
 import SpriteText from 'https://esm.sh/three-spritetext@1?external=three';
-import { forceY, forceCollide } from 'https://esm.sh/d3-force-3d@3';
+import { forceCollide } from 'https://esm.sh/d3-force-3d@3';
 import * as THREE from 'three';
 
 const API_URL = location.hostname === 'localhost' && location.port && location.port !== '3001'
@@ -556,7 +556,13 @@ const Graph = new ForceGraph3D(container, {
     if (node.type === 'hub') openGroupPanel(node.key);
     else if (node.type === 'word') openGroupPanel(activeKeyOf(node.word));
   })
-  .onNodeDragEnd(node => { node.fx = null; node.fy = null; node.fz = null; })
+  .onNodeDrag(node => {
+    if (state.syllableAltitude && node.type === 'word') clampNodeToStratum(node, true);
+  })
+  .onNodeDragEnd(node => {
+    node.fx = null; node.fy = null; node.fz = null;
+    if (state.syllableAltitude && node.type === 'word') clampNodeToStratum(node);
+  })
   .onNodeHover(node => {
     container.style.cursor = node ? 'pointer' : '';
     if (hoveredNode === node) return;
@@ -688,11 +694,27 @@ function stratumY(syllables) {
   return ((syllables || 1) - 2) * stratumSpacing();
 }
 
+function clampNodeToStratum(node, pin = false) {
+  if (node.type !== 'word') return;
+  const y = stratumY(node.word.syllables);
+  node.y = y;
+  node.vy = 0;
+  if (pin) node.fy = y;
+}
+
+function syllablePlaneForce() {
+  let nodes = [];
+  const force = () => {
+    if (!state.syllableAltitude) return;
+    for (const node of nodes) clampNodeToStratum(node);
+  };
+  force.initialize = ns => { nodes = ns; };
+  return force;
+}
+
 function applyAltitudeForce() {
   if (state.syllableAltitude) {
-    Graph.d3Force('syllY',
-      forceY(n => n.type === 'word' ? stratumY(n.word.syllables) : 0)
-        .strength(n => n.type === 'word' ? 0.85 : 0));
+    Graph.d3Force('syllY', syllablePlaneForce());
   } else {
     Graph.d3Force('syllY', null);
   }
@@ -884,7 +906,7 @@ function makeNodeObject(node) {
 
 function refreshGraph() {
   Graph.d3Force('charge').strength(scaledCharge());
-  if (state.syllableAltitude) applyAltitudeForce(); // spacing scales with word count
+  applyAltitudeForce(); // install/remove altitude constraint as spacing scales
   // graphData() reheats the simulation itself when the data changes
   Graph.graphData(buildGraphData());
   updateStrataGuides();
