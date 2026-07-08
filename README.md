@@ -19,6 +19,8 @@ This repo is prepared for Vercel. Import it as a plain Node/static project and k
 
 The frontend uses same-origin API calls in production, while local development still points the `:3000` static server at the API on `:3001`.
 
+No environment variables are required for the current deployment. Datamuse is called server-side without a key, and CMU scansion data comes from the backend dependency install. If Datamuse keys become required later, add the key as a Vercel environment variable and keep the browser on same-origin `/api/*` calls.
+
 ## The pages
 
 ### ✍️ Workspace (`workspace.html`) — the centerpiece
@@ -50,6 +52,7 @@ The original 2D prototype: a light staging canvas for collecting words before op
 - **Meaning**: Datamuse `ml=` semantic neighbors, stored per word; pairwise links.
 - **Stress & syllables**: the [CMU Pronouncing Dictionary](https://github.com/words/cmu-pronouncing-dictionary) (135k words) for true stress patterns.
 - **Gematria**: Alphanumeric Qabbala — base-36, digits keep face value, A–Z map to 10–35, summed; zone = digital root.
+- **Input safety**: words restored from localStorage/share links and words submitted to the legacy explorer are normalized before entering graph state or API graph output.
 
 ## Credits
 

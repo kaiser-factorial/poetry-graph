@@ -42,6 +42,8 @@ vercel.json              rewrites /api/* to the function and / to workspace.html
 
 **Workspace state** (`localStorage: poetry-workspace-v2`): `{ mode, words[{text, rhymeKey, onsetKey, pos, syllables, stress, similar, lineEnd?}], forceWeights, customEdges, literalAlliteration, syllableAltitude, numoLayout, draft, form, formSlots, formBodies }`. UI state (`poetry-workspace-ui-v1`): panel pos/size/collapse, camLock, scansion. Share links: `#s=<urlencoded JSON>` (trimmed: no `similar`), consumed and stripped on load.
 
+**State/input safety**: `workspace.js` sanitizes word records and custom edges loaded from localStorage or share links before rendering. Keep that boundary intact because several panel paths still render chips with `innerHTML`. The legacy explorer's `/api/graph` path normalizes submitted words in `buildPoetryGraph()` before returning node labels, which prevents arbitrary custom words from being echoed as markup by `public/app.js`.
+
 ### Gotchas worth remembering
 - **Cache-bust `workspace.js?v=N`** in workspace.html on every JS change; browsers held stale copies before `-c-1` (that whole saga: `d3 is not defined`).
 - **esm.sh import map** needs `three`, `three/webgpu`, `three/tsl`, and both `three/addons/` + `three/examples/jsm/` aliases, with `?external=three` on packages — otherwise duplicate THREE instances.
@@ -51,6 +53,7 @@ vercel.json              rewrites /api/* to the function and / to workspace.html
 - **Verification pattern**: puppeteer-core + installed Chrome + `--use-angle=swiftshader --enable-unsafe-swiftshader` renders WebGL headless. Scripts from this session live in the session scratchpad (ephemeral) — the pattern: seed via URL, drive via `window.__ws` debug hook (`state`, `graph`, `addWord`, `refreshGraph`), screenshot, assert on `graph.graphData()`.
 - `node --check` rejects workspace.js (ES module) — meaningless failure, ignore.
 - Curly apostrophes: all tokenizers normalize U+2019/2018 → `'`; read-mode peels contraction suffixes (`she'd` → `she`, not `shed`).
+- Vercel CLI local smoke tests may fail if a stale local token is configured; the deployment itself needs no env vars today.
 
 ## Loose threads
 
