@@ -301,9 +301,17 @@ async function fetchAlliterations(onset) {
 }
 
 // CMU pronouncing dictionary: real stress patterns ("beautiful" -> "100")
-const { dictionary: cmuDict } = require('cmu-pronouncing-dictionary');
+// ESM-only package — load it via dynamic import from this CommonJS module.
+let cmuDictPromise = null;
+function getCmuDict() {
+  if (!cmuDictPromise) {
+    cmuDictPromise = import('cmu-pronouncing-dictionary').then(mod => mod.dictionary);
+  }
+  return cmuDictPromise;
+}
 
-function stressOf(word) {
+async function stressOf(word) {
+  const cmuDict = await getCmuDict();
   const pron = cmuDict[word];
   if (!pron) return null;
   const digits = pron.match(/\d/g);
@@ -363,9 +371,8 @@ app.get('/api/word-info', async (req, res) => {
   const word = normalize(raw);
   const ending = getRhymeEnding(word);
   const onset = getOnset(word);
-  const stress = stressOf(word);
-  const [rhymes, meta, similar] = await Promise.all([
-    fetchRhymes(word), fetchWordMeta(word), fetchSimilar(word),
+  const [stress, rhymes, meta, similar] = await Promise.all([
+    stressOf(word), fetchRhymes(word), fetchWordMeta(word), fetchSimilar(word),
   ]);
 
   res.json({
