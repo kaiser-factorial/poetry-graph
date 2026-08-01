@@ -912,6 +912,7 @@ function refreshGraph() {
   updateStrataGuides();
   updateSpiralGuide();
   renderForcesPanel();
+  renderViewControls();
 }
 
 // ===== Word management =====
@@ -1055,6 +1056,7 @@ function closePanel() {
 }
 
 function openAddPanel() {
+  closeControlMenus();
   panelMode = 'add';
   selectedGroupKey = null;
   panel.style.display = 'flex';
@@ -1250,48 +1252,13 @@ function renderForcesPanel() {
         <label>Poem flow <span class="mark">→</span></label>
         <input type="range" min="0" max="100" value="${Math.round((state.forceWeights.flow || 0) * 100)}" data-type="flow" ${state.draft ? '' : 'disabled'}>
       </div>
-      <div class="force-row alt-row">
-        <span class="swatch" style="background:${CONNECTION_TYPES.syllables.color}; opacity:0.5"></span>
-        <label style="width:auto; cursor:pointer; display:flex; align-items:center; gap:6px;">
-          <input type="checkbox" id="altToggle" ${state.syllableAltitude ? 'checked' : ''}>
-          syllables as altitude
-        </label>
-      </div>
       <div class="force-row ${state.draft ? '' : 'disabled'}" title="${state.draft ? 'alliterating words link only when they follow one another in the draft' : 'write in the Draft first — adjacency needs a poem'}">
         <span class="swatch" style="background:${CONNECTION_TYPES.alliteration.color}; opacity:0.5"></span>
         <label style="width:auto; cursor:pointer; display:flex; align-items:center; gap:6px;">
           <input type="checkbox" id="literalAllitToggle" ${state.literalAlliteration ? 'checked' : ''} ${state.draft ? '' : 'disabled'}>
           literal alliteration (adjacent only)
         </label>
-      </div>
-      <div class="force-row cam-row" title="key and scale for the Perform ritual — zones become scale degrees">
-        <label>Music</label>
-        <div class="cam-btns">
-          <select id="musicKeySel">${Object.keys(KEYS).map(k =>
-            `<option value="${k}" ${ui.musicKey === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
-          <select id="musicScaleSel">${Object.entries(SCALES).map(([id, s]) =>
-            `<option value="${id}" ${ui.musicScale === id ? 'selected' : ''}>${s.label}</option>`).join('')}</select>
-          <select id="musicTempoSel">${Object.entries(TEMPOS).map(([id, t]) =>
-            `<option value="${id}" ${ui.musicTempo === id ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
-        </div>
-      </div>
-      <div class="force-row cam-row">
-        <label>Camera</label>
-        <div class="cam-btns">
-          <button data-cam="free" class="${ui.camLock === 'free' ? 'on' : ''}" title="orbit freely">free</button>
-          <button data-cam="turntable" class="${ui.camLock === 'turntable' ? 'on' : ''}" title="rotate around the vertical axis only">spin</button>
-          <button data-cam="tilt" class="${ui.camLock === 'tilt' ? 'on' : ''}" title="pitch over the top only">tilt</button>
-          <button data-cam="face" title="square up to the graph">face</button>
-        </div>
-      </div>
-      ${state.mode === 'gematria' ? `
-      <div class="force-row cam-row">
-        <label>Numogram</label>
-        <div class="cam-btns">
-          <button data-layout="plate" class="${state.numoLayout === 'plate' ? 'on' : ''}" title="the canonical decimal labyrinth, regions folded in depth">plate</button>
-          <button data-layout="spiral" class="${state.numoLayout === 'spiral' ? 'on' : ''}" title="Barker spiral — syzygies as turns of a helix, 4::5 innermost">spiral</button>
-        </div>
-      </div>` : ''}`;
+      </div>`;
 
   rows.querySelectorAll('input[type="range"]').forEach(slider => {
     slider.addEventListener('input', () => {
@@ -1301,51 +1268,10 @@ function renderForcesPanel() {
     });
   });
 
-  rows.querySelector('#altToggle').addEventListener('change', e => {
-    state.syllableAltitude = e.target.checked;
-    saveState();
-    applyAltitudeForce();
-    refreshGraph();
-  });
-
   rows.querySelector('#literalAllitToggle')?.addEventListener('change', e => {
     state.literalAlliteration = e.target.checked;
     saveState();
     refreshGraph();
-  });
-
-  rows.querySelector('#musicKeySel')?.addEventListener('change', e => {
-    ui.musicKey = e.target.value;
-    saveUi();
-  });
-  rows.querySelector('#musicScaleSel')?.addEventListener('change', e => {
-    ui.musicScale = e.target.value;
-    saveUi();
-  });
-  rows.querySelector('#musicTempoSel')?.addEventListener('change', e => {
-    ui.musicTempo = e.target.value;
-    saveUi();
-  });
-
-  rows.querySelectorAll('[data-cam]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.dataset.cam === 'face') { faceThePlate(); return; }
-      ui.camLock = btn.dataset.cam;
-      saveUi();
-      applyCamLock();
-      rows.querySelectorAll('[data-cam]').forEach(b =>
-        b.classList.toggle('on', b.dataset.cam === ui.camLock));
-    });
-  });
-
-  rows.querySelectorAll('[data-layout]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (state.numoLayout === btn.dataset.layout) return;
-      state.numoLayout = btn.dataset.layout;
-      saveState();
-      refreshGraph();
-      setTimeout(() => Graph.zoomToFit(800, 40, n => n.type === 'hub'), 1200);
-    });
   });
 }
 
@@ -2075,6 +2001,7 @@ function shareLink() {
 }
 
 function openExportPanel() {
+  closeControlMenus();
   panelMode = 'export';
   selectedGroupKey = null;
   panel.style.display = 'flex';
@@ -2151,6 +2078,106 @@ const TEMPOS = {
   allegro: { label: 'allegro', mult: 1.4 },
   presto: { label: 'presto', mult: 1.9 },
 };
+
+// ===== Corner controls =====
+// Performance sound belongs to the ritual itself; camera and altitude belong
+// to the graph. Keep those settings out of the connection-force panel.
+const performControl = document.querySelector('.perform-control');
+const performConfigBtn = document.querySelector('#performConfigBtn');
+const performMenu = document.querySelector('#performMenu');
+const viewControl = document.querySelector('#viewControl');
+const viewToggle = document.querySelector('#viewToggle');
+const viewPopover = document.querySelector('#viewPopover');
+const altitudeToggle = document.querySelector('#altToggle');
+const numogramViewRow = document.querySelector('#numogramViewRow');
+
+function setMenuOpen(trigger, menu, open) {
+  menu.hidden = !open;
+  trigger.setAttribute('aria-expanded', String(open));
+}
+
+function closeControlMenus() {
+  setMenuOpen(performConfigBtn, performMenu, false);
+  setMenuOpen(viewToggle, viewPopover, false);
+}
+
+function renderPerformanceSettings() {
+  const keySelect = document.querySelector('#musicKeySel');
+  const scaleSelect = document.querySelector('#musicScaleSel');
+  const tempoSelect = document.querySelector('#musicTempoSel');
+  keySelect.innerHTML = Object.keys(KEYS).map(key =>
+    `<option value="${key}" ${ui.musicKey === key ? 'selected' : ''}>${key}</option>`).join('');
+  scaleSelect.innerHTML = Object.entries(SCALES).map(([id, scale]) =>
+    `<option value="${id}" ${ui.musicScale === id ? 'selected' : ''}>${scale.label}</option>`).join('');
+  tempoSelect.innerHTML = Object.entries(TEMPOS).map(([id, tempo]) =>
+    `<option value="${id}" ${ui.musicTempo === id ? 'selected' : ''}>${tempo.label}</option>`).join('');
+}
+
+function renderViewControls() {
+  altitudeToggle.checked = state.syllableAltitude;
+  viewControl.querySelectorAll('[data-cam]').forEach(btn =>
+    btn.classList.toggle('on', btn.dataset.cam === ui.camLock));
+  numogramViewRow.hidden = state.mode !== 'gematria';
+  viewControl.querySelectorAll('[data-layout]').forEach(btn =>
+    btn.classList.toggle('on', btn.dataset.layout === state.numoLayout));
+}
+
+performConfigBtn.addEventListener('click', () => {
+  const willOpen = performMenu.hidden;
+  setMenuOpen(viewToggle, viewPopover, false);
+  setMenuOpen(performConfigBtn, performMenu, willOpen);
+});
+
+viewToggle.addEventListener('click', () => {
+  const willOpen = viewPopover.hidden;
+  setMenuOpen(performConfigBtn, performMenu, false);
+  setMenuOpen(viewToggle, viewPopover, willOpen);
+});
+
+document.querySelector('#musicKeySel').addEventListener('change', e => {
+  ui.musicKey = e.target.value;
+  saveUi();
+});
+document.querySelector('#musicScaleSel').addEventListener('change', e => {
+  ui.musicScale = e.target.value;
+  saveUi();
+});
+document.querySelector('#musicTempoSel').addEventListener('change', e => {
+  ui.musicTempo = e.target.value;
+  saveUi();
+});
+
+altitudeToggle.addEventListener('change', e => {
+  state.syllableAltitude = e.target.checked;
+  saveState();
+  applyAltitudeForce();
+  refreshGraph();
+});
+
+viewControl.querySelectorAll('[data-cam]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.cam === 'face') { faceThePlate(); return; }
+    ui.camLock = btn.dataset.cam;
+    saveUi();
+    applyCamLock();
+    renderViewControls();
+  });
+});
+
+viewControl.querySelectorAll('[data-layout]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (state.numoLayout === btn.dataset.layout) return;
+    state.numoLayout = btn.dataset.layout;
+    saveState();
+    refreshGraph();
+    setTimeout(() => Graph.zoomToFit(800, 40, n => n.type === 'hub'), 1200);
+  });
+});
+
+document.addEventListener('click', e => {
+  if (!performControl.contains(e.target)) setMenuOpen(performConfigBtn, performMenu, false);
+  if (!viewControl.contains(e.target)) setMenuOpen(viewToggle, viewPopover, false);
+});
 
 function tempoMult() {
   return (TEMPOS[ui.musicTempo] || TEMPOS.andante).mult;
@@ -2451,7 +2478,9 @@ document.querySelector('#performBtn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && performing) stopPerformance();
+  if (e.key !== 'Escape') return;
+  closeControlMenus();
+  if (performing) stopPerformance();
 });
 
 // ===== Toolbar =====
@@ -2517,6 +2546,8 @@ async function initFromSeed() {
 
 loadState();
 initFromShare();
+renderPerformanceSettings();
+renderViewControls();
 // The serif renders into canvas sprites, so it must be loaded before first draw
 const fontsReady = Promise.all([
   document.fonts.load(`500 116px ${SERIF}`),

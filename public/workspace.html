@@ -79,6 +79,82 @@
 
         .toolbar { display: flex; align-items: baseline; gap: 22px; }
 
+        .perform-control {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+        }
+
+        .perform-control .button { white-space: nowrap; }
+        .perform-control #performBtn { border-right: none; }
+
+        .perform-config-trigger {
+            min-width: 32px;
+            padding-inline: 8px !important;
+            font-size: 0.8rem !important;
+        }
+
+        .perform-config-trigger[aria-expanded="true"] {
+            color: var(--brass) !important;
+            border-color: rgba(179, 149, 84, 0.55) !important;
+        }
+
+        .perform-menu,
+        .corner-popover {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--hairline-strong);
+            box-shadow: 0 14px 38px rgba(0, 0, 0, 0.52);
+        }
+
+        .perform-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 242px;
+            padding: 12px;
+            z-index: 15;
+        }
+
+        .perform-menu[hidden],
+        .corner-popover[hidden] { display: none; }
+
+        .control-menu-title {
+            color: var(--muted);
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            margin-bottom: 9px;
+        }
+
+        .perform-setting {
+            display: grid;
+            grid-template-columns: 56px minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+            margin-top: 7px;
+            color: var(--muted);
+            font-size: 0.66rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .perform-setting select,
+        .corner-popover select {
+            min-width: 0;
+            background: #1c1b23;
+            color: var(--bone);
+            border: 1px solid var(--hairline);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.7rem;
+            padding: 5px 7px;
+            cursor: pointer;
+        }
+
+        .perform-setting select:hover,
+        .corner-popover select:hover { border-color: var(--hairline-strong); }
+
         .mode-toggle { display: flex; gap: 18px; }
 
         .mode-toggle button {
@@ -132,10 +208,107 @@
 
         #graph3d { width: 100%; height: 100%; }
 
+        /* View and export live with the graph rather than the editorial toolbar. */
+        .view-control {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 8;
+        }
+
+        .corner-button {
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--hairline-strong);
+            color: var(--bone);
+            padding: 7px 12px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.67rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .corner-button:hover,
+        .corner-button[aria-expanded="true"] {
+            color: var(--brass);
+            border-color: rgba(179, 149, 84, 0.62);
+            transform: translateY(-1px);
+        }
+
+        .corner-popover {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 268px;
+            padding: 13px 14px;
+        }
+
+        .view-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .view-row:first-of-type { margin-top: 0; }
+
+        .view-label {
+            color: var(--muted);
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            white-space: nowrap;
+        }
+
+        .view-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            color: var(--bone);
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+        }
+
+        .view-toggle-label input { accent-color: var(--brass); }
+
+        .view-controls { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+
+        .view-controls button {
+            background: transparent;
+            border: 1px solid var(--hairline);
+            color: var(--muted);
+            padding: 3px 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            transition: all 0.2s ease;
+        }
+
+        .view-controls button:hover { color: var(--bone); border-color: var(--hairline-strong); }
+        .view-controls button.on { color: var(--brass); border-color: rgba(179, 149, 84, 0.55); }
+
+        .view-row--numogram {
+            padding-top: 10px;
+            border-top: 1px solid var(--hairline);
+        }
+
+        .corner-export {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            z-index: 7;
+        }
+
         /* Side panel */
         .panel {
             position: absolute;
-            top: 20px;
+            top: 68px;
             right: 20px;
             width: 300px;
             max-height: calc(100% - 40px);
@@ -364,7 +537,10 @@
         .force-row label .mark { color: var(--muted); font-size: 0.85em; }
 
         .force-row input[type="range"] {
-            flex: 1;
+            flex: 1 1 0;
+            width: 0;
+            min-width: 0;
+            max-width: 100%;
             accent-color: var(--brass);
             height: 2px;
         }
@@ -420,7 +596,7 @@
         .draft {
             position: absolute;
             right: 20px;
-            bottom: 20px;
+            bottom: 68px;
             width: 360px;
             height: 300px;
             background: var(--surface);
@@ -748,8 +924,16 @@
             </div>
             <button class="button primary" id="addWordBtn">＋ Add Word</button>
             <button class="button" id="draftBtn">Draft</button>
-            <button class="button" id="performBtn" title="the poem plays itself across the map — camera, light, and tone">Perform</button>
-            <button class="button" id="exportBtn">Export</button>
+            <div class="perform-control">
+                <button class="button" id="performBtn" title="the poem plays itself across the map — camera, light, and tone">Perform</button>
+                <button class="button perform-config-trigger" id="performConfigBtn" aria-label="Open performance sound settings" aria-controls="performMenu" aria-expanded="false" title="performance sound settings">⌄</button>
+                <div class="perform-menu" id="performMenu" hidden>
+                    <p class="control-menu-title">Performance sound</p>
+                    <label class="perform-setting">Key <select id="musicKeySel" aria-label="Performance key"></select></label>
+                    <label class="perform-setting">Scale <select id="musicScaleSel" aria-label="Performance scale"></select></label>
+                    <label class="perform-setting">Speed <select id="musicTempoSel" aria-label="Performance speed"></select></label>
+                </div>
+            </div>
             <button class="button" id="newPoemBtn">New Poem</button>
             <a href="read.html">Read</a>
             <a href="forms.html">Forms</a>
@@ -759,6 +943,36 @@
 
     <main>
         <div id="graph3d"></div>
+
+        <div class="view-control" id="viewControl">
+            <button class="corner-button" id="viewToggle" aria-controls="viewPopover" aria-expanded="false">View ⌄</button>
+            <div class="corner-popover" id="viewPopover" hidden>
+                <div class="view-row">
+                    <span class="view-label">Camera</span>
+                    <div class="view-controls" aria-label="Camera controls">
+                        <button data-cam="free" title="orbit freely">free</button>
+                        <button data-cam="turntable" title="rotate around the vertical axis only">spin</button>
+                        <button data-cam="tilt" title="pitch over the top only">tilt</button>
+                        <button data-cam="face" title="square up to the graph">face</button>
+                    </div>
+                </div>
+                <div class="view-row">
+                    <label class="view-toggle-label" for="altToggle">
+                        <input type="checkbox" id="altToggle">
+                        syllables as altitude
+                    </label>
+                </div>
+                <div class="view-row view-row--numogram" id="numogramViewRow" hidden>
+                    <span class="view-label">Numogram</span>
+                    <div class="view-controls" aria-label="Numogram layout controls">
+                        <button data-layout="plate" title="the canonical decimal labyrinth, regions folded in depth">plate</button>
+                        <button data-layout="spiral" title="Barker spiral — syzygies as turns of a helix">spiral</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="corner-button corner-export" id="exportBtn">Export</button>
 
         <div class="panel" id="panel" style="display: none;">
             <div class="panel-header drag-handle">
